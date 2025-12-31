@@ -26,11 +26,16 @@ const linearTransformer = new LinearTransformer(
 
 const linearCreator = new LinearIssueCreator(config.linear.apiKey);
 
+// Use KV if KV environment variables are set (Vercel deployment)
+const useKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 const slackReviewer = new SlackReviewer(
   config.slack.botToken,
   config.slack.signingSecret,
-  config.slack.channelId
+  config.slack.channelId,
+  useKV
 );
+// Set Linear creator for callback execution (required for KV mode)
+slackReviewer.setLinearCreator(linearCreator);
 
 // Create Express app
 const app = express();
@@ -86,32 +91,34 @@ app.use((err: Error, req: Request, res: Response, next: any) => {
   });
 });
 
-// Start server
-const port = config.port;
+// Export app for Vercel/serverless
+export default app;
 
-// Start Express server
-app.listen(port, async () => {
-  logger.info(`Express server started on port ${port}`);
-  logger.info(`Fathom webhook endpoint: http://localhost:${port}/webhook/fathom`);
-  logger.info(`Slack events endpoint: http://localhost:${port}/slack/events`);
-  logger.info(`Health check: http://localhost:${port}/health`);
-});
+// Only start server if not in serverless environment (Vercel sets VERCEL env var)
+if (!process.env.VERCEL) {
+  const port = config.port;
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  slackReviewer.stop().then(() => {
-    process.exit(0);
+  // Start Express server
+  app.listen(port, async () => {
+    logger.info(`Express server started on port ${port}`);
+    logger.info(`Fathom webhook endpoint: http://localhost:${port}/webhook/fathom`);
+    logger.info(`Slack events endpoint: http://localhost:${port}/slack/events`);
+    logger.info(`Health check: http://localhost:${port}/health`);
   });
-});
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  slackReviewer.stop().then(() => {
-    process.exit(0);
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    slackReviewer.stop().then(() => {
+      process.exit(0);
+    });
   });
-});
 
-// Export for testing
-export { app };
+  process.on('SIGINT', () => {
+    logger.info('SIGINT received, shutting down gracefully');
+    slackReviewer.stop().then(() => {
+      process.exit(0);
+    });
+  });
+}
 

@@ -31,6 +31,14 @@ export const config = {
     signingSecret: process.env.SLACK_SIGNING_SECRET || '',
     channelId: process.env.SLACK_CHANNEL_ID || '',
   },
+  
+  vercel: {
+    kv: {
+      url: process.env.KV_URL || '',
+      restApiUrl: process.env.KV_REST_API_URL || '',
+      restApiToken: process.env.KV_REST_API_TOKEN || '',
+    },
+  },
 };
 
 // Validate required environment variables

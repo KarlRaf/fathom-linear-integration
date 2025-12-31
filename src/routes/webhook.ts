@@ -85,26 +85,11 @@ export function createWebhookRouter(services: {
       }
 
       // Request Slack review
+      // Note: With KV, callback is not used - approval handler will create issues directly
       try {
         const reviewId = await services.slackReviewer.requestReview(
           actionItems,
-          linearIssues,
-          async (approved: boolean) => {
-            if (approved) {
-              try {
-                const issueIds = await services.linearCreator.createIssues(linearIssues);
-                logger.info(`Created ${issueIds.length} issues in Linear:`, issueIds);
-                
-                // Optionally post success message to Slack
-                // This could be enhanced to post individual issue links
-              } catch (error) {
-                logger.error('Failed to create Linear issues after approval:', error);
-                throw error;
-              }
-            } else {
-              logger.info('Issue creation rejected by reviewer');
-            }
-          }
+          linearIssues
         );
 
         logger.info(`Review ${reviewId} posted to Slack`);
