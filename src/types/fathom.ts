@@ -1,3 +1,11 @@
+export interface CalendarInvitee {
+  name?: string;
+  email?: string;
+  email_domain?: string;
+  is_external?: boolean;
+  [key: string]: any; // Allow additional properties from Fathom
+}
+
 export interface FathomWebhookPayload {
   event: {
     id: string;
@@ -25,5 +33,6 @@ export interface FathomWebhookPayload {
     text: string;
     owner?: string;
   }>;
+  calendar_invitees?: CalendarInvitee[];
 }
 

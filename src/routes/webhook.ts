@@ -14,7 +14,7 @@ export function createWebhookRouter(services: {
   actionExtractor: ActionItemExtractor;
   linearTransformer: LinearTransformer;
   linearCreator: LinearIssueCreator;
-  slackReviewer: SlackReviewer;
+  slackReviewer?: SlackReviewer;
 }) {
   const router = Router();
 
@@ -84,26 +84,45 @@ export function createWebhookRouter(services: {
         return res.status(500).json({ error: 'Failed to transform action items' });
       }
 
-      // Request Slack review
-      // Note: With KV, callback is not used - approval handler will create issues directly
-      try {
-        const reviewId = await services.slackReviewer.requestReview(
-          actionItems,
-          linearIssues
-        );
+      // Request Slack review (if Slack is configured)
+      if (services.slackReviewer) {
+        // Note: With KV, callback is not used - approval handler will create issues directly
+        try {
+          const reviewId = await services.slackReviewer.requestReview(
+            actionItems,
+            linearIssues
+          );
 
-        logger.info(`Review ${reviewId} posted to Slack`);
-      } catch (error) {
-        logger.error('Failed to post review to Slack:', error);
-        return res.status(500).json({ error: 'Failed to post review to Slack' });
+          logger.info(`Review ${reviewId} posted to Slack`);
+          
+          return res.json({
+            message: 'Processing started - review pending in Slack',
+            actionItemsCount: actionItems.length,
+            reviewRequired: true,
+            recordingId: payload.recording.id,
+          });
+        } catch (error) {
+          logger.error('Failed to post review to Slack:', error);
+          return res.status(500).json({ error: 'Failed to post review to Slack' });
+        }
+      } else {
+        // Slack not configured - create issues directly
+        try {
+          const issueIds = await services.linearCreator.createIssues(linearIssues);
+          logger.info(`Created ${issueIds.length} issues in Linear:`, issueIds);
+          
+          return res.json({
+            message: 'Processing complete - issues created in Linear',
+            actionItemsCount: actionItems.length,
+            issuesCreated: issueIds.length,
+            reviewRequired: false,
+            recordingId: payload.recording.id,
+          });
+        } catch (error) {
+          logger.error('Failed to create Linear issues:', error);
+          return res.status(500).json({ error: 'Failed to create Linear issues' });
+        }
       }
-
-      res.json({
-        message: 'Processing started - review pending in Slack',
-        actionItemsCount: actionItems.length,
-        reviewRequired: true,
-        recordingId: payload.recording.id,
-      });
     } catch (error) {
       logger.error('Webhook processing error:', error);
       res.status(500).json({

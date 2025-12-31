@@ -26,16 +26,29 @@ const linearTransformer = new LinearTransformer(
 
 const linearCreator = new LinearIssueCreator(config.linear.apiKey);
 
-// Use KV if KV environment variables are set (Vercel deployment)
-const useKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-const slackReviewer = new SlackReviewer(
-  config.slack.botToken,
-  config.slack.signingSecret,
-  config.slack.channelId,
-  useKV
-);
-// Set Linear creator for callback execution (required for KV mode)
-slackReviewer.setLinearCreator(linearCreator);
+// Initialize Slack reviewer only if credentials are provided
+// Make it optional to allow server to start without Slack configured
+let slackReviewer: SlackReviewer | undefined;
+try {
+  if (config.slack.botToken && config.slack.signingSecret && config.slack.channelId) {
+    // Use KV if KV environment variables are set (Vercel deployment)
+    const useKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+    slackReviewer = new SlackReviewer(
+      config.slack.botToken,
+      config.slack.signingSecret,
+      config.slack.channelId,
+      useKV
+    );
+    // Set Linear creator for callback execution (required for KV mode)
+    slackReviewer.setLinearCreator(linearCreator);
+    logger.info('Slack reviewer initialized');
+  } else {
+    logger.warn('Slack credentials not provided - Slack review feature will be disabled');
+  }
+} catch (error) {
+  logger.warn('Failed to initialize Slack reviewer - Slack review feature will be disabled:', error);
+  slackReviewer = undefined;
+}
 
 // Create Express app
 const app = express();
@@ -79,8 +92,10 @@ if (config.nodeEnv === 'development') {
   logger.info('Test endpoint available at: /test/mock-webhook');
 }
 
-// Mount Slack Bolt receiver on the same Express server
-app.use('/slack/events', slackReviewer.getRouter());
+// Mount Slack Bolt receiver on the same Express server (only if Slack is configured)
+if (slackReviewer) {
+  app.use('/slack/events', slackReviewer.getRouter());
+}
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: any) => {
@@ -109,16 +124,24 @@ if (!process.env.VERCEL) {
   // Graceful shutdown
   process.on('SIGTERM', () => {
     logger.info('SIGTERM received, shutting down gracefully');
-    slackReviewer.stop().then(() => {
+    if (slackReviewer) {
+      slackReviewer.stop().then(() => {
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
+    }
   });
 
   process.on('SIGINT', () => {
     logger.info('SIGINT received, shutting down gracefully');
-    slackReviewer.stop().then(() => {
+    if (slackReviewer) {
+      slackReviewer.stop().then(() => {
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
+    }
   });
 }
 
