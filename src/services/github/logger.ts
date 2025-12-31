@@ -16,7 +16,7 @@ export class GitHubLogger {
   async logTranscript(transcript: FathomWebhookPayload): Promise<void> {
     try {
       const date = new Date().toISOString().split('T')[0];
-      const filename = `transcripts/${date}/${transcript.recording.id}.json`;
+      const filename = `call_transcript/${date}/${transcript.recording.id}.json`;
       const content = JSON.stringify(transcript, null, 2);
       const contentBase64 = Buffer.from(content).toString('base64');
 

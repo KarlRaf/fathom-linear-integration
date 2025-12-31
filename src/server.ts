@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { config } from './config/env';
 import { logger } from './utils/logger';
 import { createWebhookRouter } from './routes/webhook';
+import { createTestRouter } from './routes/test';
 import { GitHubLogger } from './services/github/logger';
 import { ActionItemExtractor } from './services/ai/action-extractor';
 import { LinearTransformer } from './services/linear/transformer';
@@ -59,6 +60,19 @@ const webhookRouter = createWebhookRouter({
 });
 
 app.use('/webhook', webhookRouter);
+
+// Test route for mock webhook (only in development)
+if (config.nodeEnv === 'development') {
+  const testRouter = createTestRouter({
+    githubLogger,
+    actionExtractor,
+    linearTransformer,
+    linearCreator,
+    slackReviewer,
+  });
+  app.use('/test', testRouter);
+  logger.info('Test endpoint available at: /test/mock-webhook');
+}
 
 // Mount Slack Bolt receiver on the same Express server
 app.use('/slack/events', slackReviewer.getRouter());
