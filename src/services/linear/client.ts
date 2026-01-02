@@ -33,26 +33,36 @@ export class LinearIssueCreator {
       logger.debug(`Calling Linear API createIssue...`);
       console.log(`[LINEAR] Calling client.createIssue...`);
       
-      const issuePayload = await retry(
-        () => {
-          console.log(`[LINEAR] Inside retry function, calling createIssue...`);
-          return this.client.createIssue(issueInput);
-        },
-        {
-          maxAttempts: 3,
-          initialDelayMs: 1000,
-          maxDelayMs: 5000,
-          retryableErrors: (error) => {
-            // Retry on network errors, timeouts, and 5xx errors
-            if (error.message?.includes('Fetch failed')) return true;
-            if (error.message?.includes('ECONNRESET') || error.message?.includes('ETIMEDOUT')) return true;
-            if (error.message?.includes('socket disconnected')) return true;
-            if (error.message?.includes('timeout')) return true;
-            // Don't retry on 4xx errors (client errors like validation)
-            return false;
+      // Add a timeout wrapper to prevent hanging (Vercel has 10s timeout on free tier)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Linear API call timed out after 8 seconds')), 8000);
+      });
+      
+      const issuePayload = await Promise.race([
+        retry(
+          () => {
+            console.log(`[LINEAR] Inside retry function, calling createIssue...`);
+            const result = this.client.createIssue(issueInput);
+            console.log(`[LINEAR] createIssue returned, result type:`, typeof result);
+            return result;
           },
-        }
-      );
+          {
+            maxAttempts: 1, // Only 1 attempt since we have timeout wrapper
+            initialDelayMs: 1000,
+            maxDelayMs: 5000,
+            retryableErrors: (error) => {
+              // Retry on network errors, timeouts, and 5xx errors
+              if (error.message?.includes('Fetch failed')) return true;
+              if (error.message?.includes('ECONNRESET') || error.message?.includes('ETIMEDOUT')) return true;
+              if (error.message?.includes('socket disconnected')) return true;
+              if (error.message?.includes('timeout')) return true;
+              // Don't retry on 4xx errors (client errors like validation)
+              return false;
+            },
+          }
+        ),
+        timeoutPromise,
+      ]) as any;
       
       logger.debug(`Issue payload received, waiting for issue to resolve...`);
       console.log(`[LINEAR] Issue payload received:`, issuePayload);
