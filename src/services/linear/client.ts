@@ -48,7 +48,12 @@ export class LinearIssueCreator {
         throw new Error('Failed to create issue: no issue returned');
       }
       
-      logger.info(`Created Linear issue: ${issue.id} - ${issue.title}`);
+      logger.info(`Created Linear issue: ${issue.id} - ${issue.title}`, {
+        issueId: issue.id,
+        issueTitle: issue.title,
+        issueUrl: issue.url,
+        teamId: input.teamId,
+      });
       return issue.id;
     } catch (error) {
       logger.error(`Failed to create Linear issue: ${input.title} after retries`, error);
