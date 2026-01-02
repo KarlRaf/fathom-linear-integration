@@ -73,13 +73,20 @@ export class SlackReviewer {
     try {
       const key = this.getKVKey(reviewId);
       logger.info(`Looking up review in KV with key: ${key}`);
-      const data = await kv.get<string>(key);
+      const data = await kv.get<ReviewRequestData | string>(key);
       if (!data) {
         logger.warn(`Review data not found in KV for key: ${key}`);
         return null;
       }
       logger.info(`Review data found in KV for key: ${key}`);
-      return JSON.parse(data) as ReviewRequestData;
+      
+      // Vercel KV might return the object directly or as a string
+      // If it's already an object, return it; otherwise parse it
+      if (typeof data === 'string') {
+        return JSON.parse(data) as ReviewRequestData;
+      } else {
+        return data as ReviewRequestData;
+      }
     } catch (error) {
       logger.error(`Failed to get review ${reviewId} from KV:`, error);
       return null;
