@@ -72,14 +72,32 @@ export class LinearIssueCreator {
         teamId: input.teamId,
       });
       return issue.id;
-    } catch (error) {
-      logger.error(`Failed to create Linear issue: ${input.title} after retries`, error);
+    } catch (error: any) {
+      // Log detailed error information
+      const errorMessage = error?.message || String(error);
+      const errorDetails = {
+        title: input.title,
+        error: errorMessage,
+        statusCode: error?.statusCode || error?.response?.status,
+        errors: error?.errors || error?.response?.data?.errors,
+        teamId: input.teamId,
+      };
+      
+      logger.error(`Failed to create Linear issue: ${input.title} after retries`, {
+        error: errorMessage,
+        statusCode: errorDetails.statusCode,
+        errors: errorDetails.errors,
+        teamId: input.teamId,
+        fullError: error,
+      });
+      
       throw error;
     }
   }
 
   async createIssues(inputs: LinearIssueInput[]): Promise<string[]> {
     const issueIds: string[] = [];
+    const errors: Array<{ title: string; error: any }> = [];
 
     // Create issues sequentially to avoid rate limits
     for (const input of inputs) {
@@ -88,13 +106,42 @@ export class LinearIssueCreator {
         issueIds.push(issueId);
         // Small delay to respect rate limits
         await new Promise((resolve) => setTimeout(resolve, 200));
-      } catch (error) {
-        logger.error(`Failed to create issue: ${input.title}`, error);
+      } catch (error: any) {
+        // Collect error details for better reporting
+        const errorMessage = error?.message || String(error);
+        const errorDetails = {
+          title: input.title,
+          error: errorMessage,
+          // Include Linear API error details if available
+          statusCode: error?.statusCode || error?.response?.status,
+          errors: error?.errors || error?.response?.data?.errors,
+        };
+        errors.push({ title: input.title, error: errorDetails });
+        
+        logger.error(`Failed to create issue: ${input.title}`, {
+          error: errorMessage,
+          statusCode: errorDetails.statusCode,
+          errors: errorDetails.errors,
+          fullError: error,
+        });
         // Continue with other issues even if one fails
       }
     }
 
-    logger.info(`Created ${issueIds.length}/${inputs.length} issues in Linear`);
+    const successCount = issueIds.length;
+    const failureCount = errors.length;
+    
+    if (failureCount > 0) {
+      logger.warn(`Created ${successCount}/${inputs.length} issues in Linear. ${failureCount} failed:`, {
+        errors: errors.map(e => ({
+          title: e.title,
+          error: typeof e.error === 'object' ? JSON.stringify(e.error) : e.error,
+        })),
+      });
+    } else {
+      logger.info(`Created ${successCount}/${inputs.length} issues in Linear successfully`);
+    }
+    
     return issueIds;
   }
 }
