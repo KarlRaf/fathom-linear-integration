@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { GitHubLogger } from '../services/github/logger';
 import { ActionItemExtractor } from '../services/ai/action-extractor';
+import { RecapGenerator } from '../services/ai/recap-generator';
 import { LinearTransformer } from '../services/linear/transformer';
 import { LinearIssueCreator } from '../services/linear/client';
 import { SlackReviewer } from '../services/slack/reviewer';
@@ -11,6 +12,7 @@ import { config } from '../config/env';
 export function createTestRouter(services: {
   githubLogger: GitHubLogger;
   actionExtractor: ActionItemExtractor;
+  recapGenerator: RecapGenerator;
   linearTransformer: LinearTransformer;
   linearCreator: LinearIssueCreator;
   slackReviewer?: SlackReviewer;
@@ -135,7 +137,31 @@ export function createTestRouter(services: {
     }
   });
 
-  // Step 3: Test Slack Review (without creating Linear issues)
+  // Step 3: Test Recap Generation
+  router.post('/test-recap', async (req: Request, res: Response) => {
+    try {
+      logger.info('Testing recap generation...');
+      const mockPayload = req.body;
+      const payload = transformMockPayload(mockPayload);
+
+      const recapText = await services.recapGenerator.generateRecap(payload);
+
+      res.json({
+        success: true,
+        message: 'Recap generated successfully',
+        recap: recapText,
+      });
+    } catch (error) {
+      logger.error('Recap generation test failed:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate recap',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // Step 4: Test Slack Review (without creating Linear issues)
   router.post('/test-slack', async (req: Request, res: Response) => {
     try {
       logger.info('Testing Slack review...');
@@ -310,19 +336,57 @@ export function createTestRouter(services: {
         return res.status(500).json({ error: 'Failed to transform action items' });
       }
 
-      // Step 5: Request Slack review (if Slack is configured)
+      // Step 5: Generate recap (always generate, even if Slack fails)
+      let recapText;
+      try {
+        recapText = await services.recapGenerator.generateRecap(payload);
+        logger.info('Recap generated successfully');
+      } catch (error) {
+        logger.error('Failed to generate recap:', error);
+        recapText = 'Failed to generate recap';
+      }
+
+      // Step 6: Post Slack recap and request Linear approval (if Slack is configured)
       if (services.slackReviewer) {
-        // Note: With KV, callback is not used - approval handler will create issues directly
         try {
+          // Step 6a: Post recap message (always, no approval needed)
+          try {
+            await services.slackReviewer.postRecapMessage(recapText);
+            logger.info('Recap message posted to Slack');
+          } catch (error) {
+            logger.error('Failed to post recap message to Slack (non-critical):', error);
+            // Continue even if recap posting fails - we'll return the recap text anyway
+          }
+
+          // Step 6b: Request approval for Linear issues
           const reviewId = await services.slackReviewer.requestReview(
             actionItems,
             linearIssues
           );
 
           logger.info(`Review ${reviewId} posted to Slack`);
+          
+          return res.json({
+            success: true,
+            message: 'Processing started - recap posted, review pending in Slack',
+            actionItemsCount: actionItems.length,
+            reviewRequired: true,
+            recordingId: payload.recording.id,
+            recap: recapText,
+            recapPosted: true,
+          });
         } catch (error) {
           logger.error('Failed to post review to Slack:', error);
-          return res.status(500).json({ error: 'Failed to post review to Slack' });
+          // Return the recap text even if Slack posting fails
+          return res.json({
+            success: false,
+            message: 'Recap generated but failed to post to Slack',
+            actionItemsCount: actionItems.length,
+            recordingId: payload.recording.id,
+            recap: recapText,
+            recapPosted: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
         }
       } else {
         logger.warn('Slack reviewer not configured - skipping Slack review step');

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { verifyWebhookSignature } from '../services/fathom/webhook-verifier';
 import { GitHubLogger } from '../services/github/logger';
 import { ActionItemExtractor } from '../services/ai/action-extractor';
+import { RecapGenerator } from '../services/ai/recap-generator';
 import { LinearTransformer } from '../services/linear/transformer';
 import { LinearIssueCreator } from '../services/linear/client';
 import { SlackReviewer } from '../services/slack/reviewer';
@@ -12,6 +13,7 @@ import { config } from '../config/env';
 export function createWebhookRouter(services: {
   githubLogger: GitHubLogger;
   actionExtractor: ActionItemExtractor;
+  recapGenerator: RecapGenerator;
   linearTransformer: LinearTransformer;
   linearCreator: LinearIssueCreator;
   slackReviewer?: SlackReviewer;
@@ -84,10 +86,20 @@ export function createWebhookRouter(services: {
         return res.status(500).json({ error: 'Failed to transform action items' });
       }
 
-      // Request Slack review (if Slack is configured)
+      // Post Slack recap and request Linear approval (if Slack is configured)
       if (services.slackReviewer) {
-        // Note: With KV, callback is not used - approval handler will create issues directly
         try {
+          // Step 1: Post recap message (always, no approval needed)
+          try {
+            const recapText = await services.recapGenerator.generateRecap(payload);
+            await services.slackReviewer.postRecapMessage(recapText);
+            logger.info('Recap message posted to Slack');
+          } catch (error) {
+            logger.error('Failed to post recap message (non-critical):', error);
+            // Continue even if recap fails - it's informational only
+          }
+
+          // Step 2: Request approval for Linear issues
           const reviewId = await services.slackReviewer.requestReview(
             actionItems,
             linearIssues
@@ -96,7 +108,7 @@ export function createWebhookRouter(services: {
           logger.info(`Review ${reviewId} posted to Slack`);
           
           return res.json({
-            message: 'Processing started - review pending in Slack',
+            message: 'Processing started - recap posted, review pending in Slack',
             actionItemsCount: actionItems.length,
             reviewRequired: true,
             recordingId: payload.recording.id,

@@ -58,7 +58,7 @@ export class ActionItemExtractor {
       logger.info('Extracting action items using OpenAI...');
       
       const response = await this.client.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-5o-mini',
         messages: [
           {
             role: 'system',

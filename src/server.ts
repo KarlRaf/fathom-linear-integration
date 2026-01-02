@@ -5,6 +5,7 @@ import { createWebhookRouter } from './routes/webhook';
 import { createTestRouter } from './routes/test';
 import { GitHubLogger } from './services/github/logger';
 import { ActionItemExtractor } from './services/ai/action-extractor';
+import { RecapGenerator } from './services/ai/recap-generator';
 import { LinearTransformer } from './services/linear/transformer';
 import { LinearIssueCreator } from './services/linear/client';
 import { SlackReviewer } from './services/slack/reviewer';
@@ -17,6 +18,7 @@ const githubLogger = new GitHubLogger(
 );
 
 const actionExtractor = new ActionItemExtractor(config.openai.apiKey);
+const recapGenerator = new RecapGenerator(config.openai.apiKey);
 
 const linearTransformer = new LinearTransformer(
   config.linear.apiKey,
@@ -72,6 +74,7 @@ app.get('/health', (req: Request, res: Response) => {
 const webhookRouter = createWebhookRouter({
   githubLogger,
   actionExtractor,
+  recapGenerator,
   linearTransformer,
   linearCreator,
   slackReviewer,
@@ -84,6 +87,7 @@ if (config.nodeEnv === 'development') {
   const testRouter = createTestRouter({
     githubLogger,
     actionExtractor,
+    recapGenerator,
     linearTransformer,
     linearCreator,
     slackReviewer,

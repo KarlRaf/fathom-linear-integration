@@ -24,6 +24,11 @@ export const config = {
     apiKey: process.env.LINEAR_API_KEY || '',
     teamId: process.env.LINEAR_TEAM_ID || '',
     projectId: process.env.LINEAR_PROJECT_ID,
+    assignee: process.env.LINEAR_ASSIGNEE || 'Karl',
+  },
+  
+  project: {
+    name: process.env.PROJECT_NAME || 'Descript',
   },
   
   slack: {
@@ -41,7 +46,7 @@ export const config = {
   },
 };
 
-// Validate required environment variables
+// Validate required environment variables (Slack is optional)
 const requiredVars = [
   { key: 'FATHOM_WEBHOOK_SECRET', value: config.fathom.webhookSecret },
   { key: 'GITHUB_TOKEN', value: config.github.token },
@@ -50,9 +55,7 @@ const requiredVars = [
   { key: 'OPENAI_API_KEY', value: config.openai.apiKey },
   { key: 'LINEAR_API_KEY', value: config.linear.apiKey },
   { key: 'LINEAR_TEAM_ID', value: config.linear.teamId },
-  { key: 'SLACK_BOT_TOKEN', value: config.slack.botToken },
-  { key: 'SLACK_SIGNING_SECRET', value: config.slack.signingSecret },
-  { key: 'SLACK_CHANNEL_ID', value: config.slack.channelId },
+  // Note: Slack variables are optional - app will work without them
 ];
 
 const missingVars = requiredVars.filter(v => !v.value);

@@ -4,6 +4,7 @@ import { kv } from '@vercel/kv';
 import { logger } from '../../utils/logger';
 import { ActionItem } from '../../types/action-item';
 import { LinearIssueInput } from '../../types/linear';
+import { FathomWebhookPayload } from '../../types/fathom';
 
 interface ReviewRequestData {
   actionItems: ActionItem[];
@@ -197,6 +198,103 @@ export class SlackReviewer {
         await respond({ text: '❌ Error processing rejection. Please try again.' });
       }
     });
+  }
+
+  /**
+   * Post a recap message to Slack (informational only, no approval needed)
+   * @param recapText - The formatted recap text from RecapGenerator
+   */
+  async postRecapMessage(recapText: string): Promise<void> {
+    try {
+      const blocks = this.createRecapBlocks(recapText);
+
+      await this.app.client.chat.postMessage({
+        channel: this.channelId,
+        text: '📋 Meeting Recap',
+        blocks,
+      });
+
+      logger.info('Recap message posted to Slack');
+    } catch (error) {
+      logger.error('Failed to post recap message to Slack:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Convert recap text into Slack blocks
+   * Handles emoji headers and bullet points
+   */
+  private createRecapBlocks(recapText: string): KnownBlock[] {
+    const blocks: KnownBlock[] = [];
+    
+    // Split by lines
+    const lines = recapText.split('\n').filter(line => line.trim());
+    
+    let currentSection: string[] = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Check if this is a header (starts with emoji, e.g., ":emoji: Title")
+      if (trimmed.match(/^:[\w-]+:\s+.+/) || trimmed.match(/^\*[\w\s]+\*/)) {
+        // If we have accumulated content, add it as a section
+        if (currentSection.length > 0) {
+          blocks.push({
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: currentSection.join('\n'),
+            },
+          });
+          currentSection = [];
+        }
+        
+        // Add divider before new section
+        if (blocks.length > 0) {
+          blocks.push({ type: 'divider' });
+        }
+        
+        // Add header as a section
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: trimmed,
+          },
+        });
+      } else if (trimmed.startsWith('@') || trimmed.startsWith('-') || trimmed.startsWith('•')) {
+        // It's a bullet point or action item
+        currentSection.push(trimmed);
+      } else if (trimmed.length > 0) {
+        // Regular text
+        currentSection.push(trimmed);
+      }
+    }
+    
+    // Add remaining content
+    if (currentSection.length > 0) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: currentSection.join('\n'),
+        },
+      });
+    }
+    
+    // If no blocks were created, just post the raw text
+    if (blocks.length === 0) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: recapText,
+        },
+      });
+    }
+    
+    return blocks;
   }
 
   async requestReview(
