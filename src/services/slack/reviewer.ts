@@ -342,7 +342,22 @@ export class SlackReviewer {
       };
 
       if (this.useKV) {
-        await this.storeReviewKV(reviewId, reviewData);
+        try {
+          await this.storeReviewKV(reviewId, reviewData);
+          logger.info(`Review ${reviewId} stored in KV successfully`);
+          
+          // Verify storage (quick check to ensure it was stored)
+          const verifyData = await this.getReviewKV(reviewId);
+          if (!verifyData) {
+            logger.error(`CRITICAL: Review ${reviewId} was not stored in KV even though storeReviewKV succeeded!`);
+          } else {
+            logger.info(`Verified: Review ${reviewId} is retrievable from KV`);
+          }
+        } catch (error) {
+          logger.error(`Failed to store review ${reviewId} in KV:`, error);
+          // Continue anyway - the message is posted, but buttons won't work
+          logger.warn(`Review message posted but KV storage failed - buttons will not work for reviewId: ${reviewId}`);
+        }
       } else {
         // For local development, warn if KV is not enabled
         logger.warn('KV not enabled - review state will not persist. Enable KV for production.');
