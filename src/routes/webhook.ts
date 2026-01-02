@@ -89,17 +89,16 @@ export function createWebhookRouter(services: {
       // Post Slack recap and request Linear approval (if Slack is configured)
       if (services.slackReviewer) {
         try {
-          // Step 1: Post recap message (always, no approval needed)
-          try {
-            const recapText = await services.recapGenerator.generateRecap(payload);
-            await services.slackReviewer.postRecapMessage(recapText);
-            logger.info('Recap message posted to Slack');
-          } catch (error) {
-            logger.error('Failed to post recap message (non-critical):', error);
-            // Continue even if recap fails - it's informational only
-          }
+          // Step 1: Post recap message (async, fire and forget - don't wait)
+          // This is non-critical and can happen in the background
+          services.recapGenerator.generateRecap(payload)
+            .then((recapText) => services.slackReviewer!.postRecapMessage(recapText))
+            .then(() => logger.info('Recap message posted to Slack'))
+            .catch((error) => {
+              logger.error('Failed to post recap message (non-critical):', error);
+            });
 
-          // Step 2: Request approval for Linear issues
+          // Step 2: Request approval for Linear issues (we need to wait for this)
           const reviewId = await services.slackReviewer.requestReview(
             actionItems,
             linearIssues
@@ -108,7 +107,7 @@ export function createWebhookRouter(services: {
           logger.info(`Review ${reviewId} posted to Slack`);
           
           return res.json({
-            message: 'Processing started - recap posted, review pending in Slack',
+            message: 'Processing started - recap posting, review pending in Slack',
             actionItemsCount: actionItems.length,
             reviewRequired: true,
             recordingId: payload.recording.id,
