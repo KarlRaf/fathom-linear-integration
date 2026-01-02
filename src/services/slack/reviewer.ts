@@ -12,6 +12,8 @@ interface ReviewRequestData {
   timestamp: number;
   messageTs?: string;
   channelId?: string;
+  approvedIssues?: number[]; // Track which issue indices have been approved (array for JSON serialization)
+  rejectedIssues?: number[]; // Track which issue indices have been rejected (array for JSON serialization)
 }
 
 export class SlackReviewer {
@@ -60,7 +62,10 @@ export class SlackReviewer {
     try {
       const key = this.getKVKey(reviewId);
       logger.info(`Storing review in KV with key: ${key}, reviewId: ${reviewId}`);
-      await kv.set(key, JSON.stringify(data), { ex: Math.floor(this.reviewTimeout / 1000) }); // TTL in seconds
+      // Ensure arrays are initialized
+      if (!data.approvedIssues) data.approvedIssues = [];
+      if (!data.rejectedIssues) data.rejectedIssues = [];
+      await kv.set(key, data, { ex: Math.floor(this.reviewTimeout / 1000) }); // Store object directly
       logger.info(`Successfully stored review ${reviewId} in KV with key: ${key}`);
     } catch (error) {
       logger.error(`Failed to store review ${reviewId} in KV:`, error);
@@ -454,7 +459,7 @@ export class SlackReviewer {
   ): Promise<string> {
     const reviewId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const blocks = this.createReviewBlocks(actionItems, linearIssues, reviewId);
+    const blocks = this.createReviewBlocks(actionItems, linearIssues, reviewId, [], []);
 
     try {
       const result = await this.app.client.chat.postMessage({
@@ -470,6 +475,8 @@ export class SlackReviewer {
         timestamp: Date.now(),
         messageTs: result.ts || undefined,
         channelId: this.channelId,
+        approvedIssues: [],
+        rejectedIssues: [],
       };
 
       if (this.useKV) {
@@ -505,14 +512,16 @@ export class SlackReviewer {
   private createReviewBlocks(
     actionItems: ActionItem[],
     linearIssues: LinearIssueInput[],
-    reviewId: string
+    reviewId: string,
+    approvedIssues: number[] = [],
+    rejectedIssues: number[] = []
   ): KnownBlock[] {
     const blocks: KnownBlock[] = [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*📋 Review Action Items for Linear*\n\nFound *${actionItems.length}* action item(s) from the meeting transcript.`,
+          text: `*📋 Review Action Items for Linear*\n\nFound *${actionItems.length}* action item(s) from the meeting transcript. Review and approve each one individually.`,
         },
       },
       {
@@ -520,47 +529,49 @@ export class SlackReviewer {
       },
     ];
 
-    // Add each action item
+    // Add each action item with its own approve/reject buttons
     linearIssues.forEach((issue, index) => {
+      const isApproved = approvedIssues.includes(index);
+      const isRejected = rejectedIssues.includes(index);
+      const status = isApproved ? '✅ Approved' : isRejected ? '❌ Rejected' : '';
+      
       blocks.push({
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*${index + 1}. ${issue.title}*\n${this.truncateDescription(issue.description)}\n\n*Priority:* ${this.getPriorityLabel(issue.priority)}${issue.assigneeId ? `\n*Assignee:* ${issue.assigneeId}` : ''}`,
+          text: `*${index + 1}. ${issue.title}* ${status}\n${this.truncateDescription(issue.description)}\n\n*Priority:* ${this.getPriorityLabel(issue.priority)}${issue.assigneeId ? `\n*Assignee:* ${issue.assigneeId}` : ''}`,
         },
       });
-    });
-
-    blocks.push(
-      {
-        type: 'divider',
-      },
-      {
-        type: 'actions',
-        elements: [
-          {
-            type: 'button',
-            text: {
-              type: 'plain_text',
-              text: '✅ Approve & Create',
+      
+      // Add action buttons only if not already approved/rejected
+      if (!isApproved && !isRejected) {
+        blocks.push({
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '✅ Approve',
+              },
+              style: 'primary',
+              action_id: 'approve_issue',
+              value: `${reviewId}:${index}`,
             },
-            style: 'primary',
-            action_id: 'approve_issues',
-            value: reviewId,
-          },
-          {
-            type: 'button',
-            text: {
-              type: 'plain_text',
-              text: '❌ Reject',
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '❌ Reject',
+              },
+              style: 'danger',
+              action_id: 'reject_issue',
+              value: `${reviewId}:${index}`,
             },
-            style: 'danger',
-            action_id: 'reject_issues',
-            value: reviewId,
-          },
-        ],
+          ],
+        });
       }
-    );
+    });
 
     return blocks;
   }

@@ -145,12 +145,8 @@ export class LinearIssueCreator {
     const issueIds: string[] = [];
     const errors: Array<{ title: string; error: any }> = [];
 
-    // TODO: For debugging, only create the first issue. Remove this limit once it works.
-    const issuesToCreate = inputs.slice(0, 1);
-    logger.info(`Creating ${issuesToCreate.length} of ${inputs.length} issues (limited for debugging)`);
-
     // Create issues sequentially to avoid rate limits
-    for (const input of issuesToCreate) {
+    for (const input of inputs) {
       try {
         const issueId = await this.createIssue(input);
         issueIds.push(issueId);
