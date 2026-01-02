@@ -13,19 +13,31 @@ export class LinearIssueCreator {
   async createIssue(input: LinearIssueInput): Promise<string> {
     try {
       logger.info(`Creating Linear issue: ${input.title}`);
+      console.log(`[LINEAR] Creating issue: ${input.title}`);
+      
+      const issueInput = {
+        teamId: input.teamId,
+        title: input.title,
+        description: input.description,
+        assigneeId: input.assigneeId,
+        projectId: input.projectId,
+        priority: input.priority,
+        dueDate: input.dueDate,
+        stateId: input.stateId,
+      };
+      
+      logger.debug(`Linear issue input:`, issueInput);
+      console.log(`[LINEAR] Issue input:`, JSON.stringify(issueInput, null, 2));
       
       // Use retry logic for Linear API calls (handles transient network failures)
+      logger.debug(`Calling Linear API createIssue...`);
+      console.log(`[LINEAR] Calling client.createIssue...`);
+      
       const issuePayload = await retry(
-        () => this.client.createIssue({
-          teamId: input.teamId,
-          title: input.title,
-          description: input.description,
-          assigneeId: input.assigneeId,
-          projectId: input.projectId,
-          priority: input.priority,
-          dueDate: input.dueDate,
-          stateId: input.stateId,
-        }),
+        () => {
+          console.log(`[LINEAR] Inside retry function, calling createIssue...`);
+          return this.client.createIssue(issueInput);
+        },
         {
           maxAttempts: 3,
           initialDelayMs: 1000,
@@ -42,8 +54,12 @@ export class LinearIssueCreator {
         }
       );
       
-      logger.debug(`Waiting for issue payload to resolve...`);
+      logger.debug(`Issue payload received, waiting for issue to resolve...`);
+      console.log(`[LINEAR] Issue payload received:`, issuePayload);
+      console.log(`[LINEAR] Waiting for issue payload.issue...`);
+      
       const issue = await issuePayload.issue;
+      console.log(`[LINEAR] Issue resolved:`, issue);
       
       logger.debug(`Issue payload resolved, checking result...`, {
         issue: issue ? 'exists' : 'null',
