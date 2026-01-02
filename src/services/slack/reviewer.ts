@@ -113,11 +113,14 @@ export class SlackReviewer {
         const reviewId = actionBody.actions[0]?.value;
         
         // Extract message info from action body immediately for instant UI feedback
-        // Slack Bolt provides this in body.message.ts and body.channel.id
+        // According to Slack Bolt docs:
+        // - body.message.ts contains the message timestamp
+        // - body.channel.id contains the channel ID
+        // - body.container.message_ts is also available as fallback
         const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
-        const channelId = actionBody.channel?.id || actionBody.container?.channel_id;
+        const channelId = actionBody.channel?.id;
         
-        logger.info(`Action body structure - message: ${JSON.stringify(actionBody.message)}, channel: ${JSON.stringify(actionBody.channel)}, container: ${JSON.stringify(actionBody.container)}`);
+        logger.info(`Action body structure - message.ts: ${actionBody.message?.ts}, channel.id: ${actionBody.channel?.id}, container.message_ts: ${actionBody.container?.message_ts}`);
         
         if (!reviewId) {
           logger.error('No reviewId found in action body:', JSON.stringify(actionBody, null, 2));
@@ -272,8 +275,9 @@ export class SlackReviewer {
         const reviewId = actionBody.actions[0]?.value;
         
         // Extract message info from action body immediately for instant UI feedback
+        // According to Slack Bolt docs: body.message.ts and body.channel.id
         const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
-        const channelId = actionBody.channel?.id || actionBody.container?.channel_id;
+        const channelId = actionBody.channel?.id;
         
         if (!reviewId) {
           logger.error('No reviewId found in reject action body');
