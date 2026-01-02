@@ -7,11 +7,13 @@ export class LinearTransformer {
   private client: LinearClient;
   private teamId: string;
   private projectId?: string;
+  private stateId?: string;
 
-  constructor(apiKey: string, teamId: string, projectId?: string) {
+  constructor(apiKey: string, teamId: string, projectId?: string, stateId?: string) {
     this.client = new LinearClient({ apiKey });
     this.teamId = teamId;
     this.projectId = projectId;
+    this.stateId = stateId;
   }
 
   async transformActionItem(item: ActionItem): Promise<LinearIssueInput> {
@@ -49,6 +51,7 @@ export class LinearTransformer {
       assigneeId,
       priority: priorityMap[item.priority] || 3,
       dueDate: item.dueDate || undefined,
+      stateId: this.stateId,
     };
   }
 

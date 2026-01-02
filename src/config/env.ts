@@ -20,12 +20,13 @@ export const config = {
     apiKey: process.env.OPENAI_API_KEY || '',
   },
   
-  linear: {
-    apiKey: process.env.LINEAR_API_KEY || '',
-    teamId: process.env.LINEAR_TEAM_ID || '',
-    projectId: process.env.LINEAR_PROJECT_ID,
-    assignee: process.env.LINEAR_ASSIGNEE || 'Karl',
-  },
+    linear: {
+      apiKey: process.env.LINEAR_API_KEY || '',
+      teamId: process.env.LINEAR_TEAM_ID || '',
+      projectId: process.env.LINEAR_PROJECT_ID,
+      stateId: process.env.LINEAR_STATE_ID, // Optional: workflow state UUID (e.g., Triage)
+      assignee: process.env.LINEAR_ASSIGNEE || 'Karl',
+    },
   
   project: {
     name: process.env.PROJECT_NAME || 'Descript',

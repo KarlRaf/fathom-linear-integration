@@ -23,7 +23,8 @@ const recapGenerator = new RecapGenerator(config.openai.apiKey);
 const linearTransformer = new LinearTransformer(
   config.linear.apiKey,
   config.linear.teamId,
-  config.linear.projectId
+  config.linear.projectId,
+  config.linear.stateId
 );
 
 const linearCreator = new LinearIssueCreator(config.linear.apiKey);

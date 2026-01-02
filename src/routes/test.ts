@@ -227,7 +227,37 @@ export function createTestRouter(services: {
     }
   });
 
-  // Step 4: Test Linear Issue Creation (bypasses Slack)
+  // Step 4: Test Linear Transformation
+  router.post('/test-transform', async (req: Request, res: Response) => {
+    try {
+      logger.info('Testing Linear transformation...');
+      const mockActionItems = req.body.actionItems; // Expecting an array of ActionItem
+
+      if (!mockActionItems || !Array.isArray(mockActionItems)) {
+        return res.status(400).json({ error: 'Invalid input: expected an array of action items' });
+      }
+
+      const linearIssues = await Promise.all(
+        mockActionItems.map((item: any) => services.linearTransformer.transformActionItem(item))
+      );
+
+      res.json({
+        success: true,
+        message: 'Action items transformed to Linear format successfully',
+        linearIssues: linearIssues,
+        count: linearIssues.length,
+      });
+    } catch (error) {
+      logger.error('Linear transformation test failed:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to transform action items to Linear format',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // Step 5: Test Linear Issue Creation (bypasses Slack)
   router.post('/test-linear', async (req: Request, res: Response) => {
     try {
       logger.info('Testing Linear issue creation...');

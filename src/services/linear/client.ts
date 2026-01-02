@@ -13,8 +13,8 @@ export class LinearIssueCreator {
     try {
       logger.info(`Creating Linear issue: ${input.title}`);
       
-      // Linear SDK uses issueCreate mutation (accessed via createIssue method)
-      const issuePayload = await (this.client as any).createIssue({
+      // Linear SDK uses createIssue method
+      const issuePayload = await this.client.createIssue({
         teamId: input.teamId,
         title: input.title,
         description: input.description,
@@ -22,6 +22,7 @@ export class LinearIssueCreator {
         projectId: input.projectId,
         priority: input.priority,
         dueDate: input.dueDate,
+        stateId: input.stateId,
       });
       
       const issue = await issuePayload.issue;

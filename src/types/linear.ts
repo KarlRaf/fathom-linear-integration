@@ -7,5 +7,6 @@ export interface LinearIssueInput {
   priority?: number; // 1-4, where 1 is urgent, 4 is no priority
   labelIds?: string[];
   dueDate?: string; // ISO date string
+  stateId?: string; // Workflow state UUID (e.g., Triage state ID)
 }
 

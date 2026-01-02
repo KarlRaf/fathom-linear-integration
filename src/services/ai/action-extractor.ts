@@ -58,7 +58,7 @@ export class ActionItemExtractor {
       logger.info('Extracting action items using OpenAI...');
       
       const response = await this.client.chat.completions.create({
-        model: 'gpt-5o-mini',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',
@@ -70,7 +70,7 @@ export class ActionItemExtractor {
           },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.3,
+        // gpt-5-mini doesn't support custom temperature, uses default (1)
       });
 
       const content = response.choices[0]?.message?.content;
