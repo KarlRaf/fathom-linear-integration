@@ -353,6 +353,184 @@ export class SlackReviewer {
         await respond({ text: '❌ Error processing rejection. Please try again.' });
       }
     });
+
+    // Handler for individual issue approval
+    this.app.action('approve_issue', async ({ ack, body, respond }) => {
+      await ack();
+      
+      try {
+        const actionBody = body as any;
+        const value = actionBody.actions[0]?.value; // Format: "reviewId:index"
+        const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
+        const channelId = actionBody.channel?.id;
+        
+        if (!value || !value.includes(':')) {
+          logger.error('Invalid approve_issue value:', value);
+          await respond({ text: '❌ Invalid request.' });
+          return;
+        }
+        
+        const [reviewId, indexStr] = value.split(':');
+        const index = parseInt(indexStr, 10);
+        
+        if (isNaN(index)) {
+          logger.error('Invalid issue index:', indexStr);
+          await respond({ text: '❌ Invalid issue index.' });
+          return;
+        }
+        
+        logger.info(`Processing individual issue approval: reviewId=${reviewId}, index=${index}`);
+        
+        // Get review data
+        let reviewData: ReviewRequestData | null = null;
+        if (this.useKV) {
+          reviewData = await this.getReviewKV(reviewId);
+        }
+        
+        if (!reviewData) {
+          await respond({ text: '❌ Review not found or expired.' });
+          return;
+        }
+        
+        // Check if already processed
+        if (reviewData.approvedIssues?.includes(index) || reviewData.rejectedIssues?.includes(index)) {
+          await respond({ text: '✅ This issue has already been processed.' });
+          return;
+        }
+        
+        // Create the single issue
+        if (this.linearCreator && reviewData.linearIssues[index]) {
+          try {
+            const issueInput = reviewData.linearIssues[index];
+            logger.info(`Creating issue ${index + 1}/${reviewData.linearIssues.length}: ${issueInput.title}`);
+            
+            const issueId = await this.linearCreator.createIssue(issueInput);
+            logger.info(`Created issue ${index + 1}: ${issueId}`);
+            
+            // Update approval state
+            if (!reviewData.approvedIssues) reviewData.approvedIssues = [];
+            reviewData.approvedIssues.push(index);
+            
+            // Save updated state
+            if (this.useKV) {
+              await this.storeReviewKV(reviewId, reviewData);
+            }
+            
+            // Update message
+            if (messageTs && channelId) {
+              const updatedBlocks = this.createReviewBlocks(
+                reviewData.actionItems,
+                reviewData.linearIssues,
+                reviewId,
+                reviewData.approvedIssues || [],
+                reviewData.rejectedIssues || []
+              );
+              
+              await this.app.client.chat.update({
+                channel: channelId,
+                ts: messageTs,
+                text: `✅ Approved issue ${index + 1}/${reviewData.linearIssues.length}`,
+                blocks: updatedBlocks,
+              });
+            }
+            
+            await respond({ 
+              text: `✅ Approved and created issue ${index + 1}: ${issueInput.title}`,
+              replace_original: false 
+            });
+          } catch (error) {
+            logger.error(`Failed to create issue ${index + 1}:`, error);
+            await respond({ text: `❌ Failed to create issue. Please check logs.` });
+          }
+        } else {
+          await respond({ text: '❌ Issue not found or Linear creator not configured.' });
+        }
+      } catch (error) {
+        logger.error('Error handling individual approval:', error);
+        await respond({ text: '❌ Error processing approval. Please try again.' });
+      }
+    });
+
+    // Handler for individual issue rejection
+    this.app.action('reject_issue', async ({ ack, body, respond }) => {
+      await ack();
+      
+      try {
+        const actionBody = body as any;
+        const value = actionBody.actions[0]?.value; // Format: "reviewId:index"
+        const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
+        const channelId = actionBody.channel?.id;
+        
+        if (!value || !value.includes(':')) {
+          logger.error('Invalid reject_issue value:', value);
+          await respond({ text: '❌ Invalid request.' });
+          return;
+        }
+        
+        const [reviewId, indexStr] = value.split(':');
+        const index = parseInt(indexStr, 10);
+        
+        if (isNaN(index)) {
+          logger.error('Invalid issue index:', indexStr);
+          await respond({ text: '❌ Invalid issue index.' });
+          return;
+        }
+        
+        logger.info(`Processing individual issue rejection: reviewId=${reviewId}, index=${index}`);
+        
+        // Get review data
+        let reviewData: ReviewRequestData | null = null;
+        if (this.useKV) {
+          reviewData = await this.getReviewKV(reviewId);
+        }
+        
+        if (!reviewData) {
+          await respond({ text: '❌ Review not found or expired.' });
+          return;
+        }
+        
+        // Check if already processed
+        if (reviewData.approvedIssues?.includes(index) || reviewData.rejectedIssues?.includes(index)) {
+          await respond({ text: '✅ This issue has already been processed.' });
+          return;
+        }
+        
+        // Update rejection state
+        if (!reviewData.rejectedIssues) reviewData.rejectedIssues = [];
+        reviewData.rejectedIssues.push(index);
+        
+        // Save updated state
+        if (this.useKV) {
+          await this.storeReviewKV(reviewId, reviewData);
+        }
+        
+        // Update message
+        if (messageTs && channelId) {
+          const updatedBlocks = this.createReviewBlocks(
+            reviewData.actionItems,
+            reviewData.linearIssues,
+            reviewId,
+            reviewData.approvedIssues || [],
+            reviewData.rejectedIssues || []
+          );
+          
+          await this.app.client.chat.update({
+            channel: channelId,
+            ts: messageTs,
+            text: `❌ Rejected issue ${index + 1}/${reviewData.linearIssues.length}`,
+            blocks: updatedBlocks,
+          });
+        }
+        
+        await respond({ 
+          text: `❌ Rejected issue ${index + 1}: ${reviewData.linearIssues[index]?.title}`,
+          replace_original: false 
+        });
+      } catch (error) {
+        logger.error('Error handling individual rejection:', error);
+        await respond({ text: '❌ Error processing rejection. Please try again.' });
+      }
+    });
   }
 
   /**
