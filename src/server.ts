@@ -105,6 +105,7 @@ if (config.nodeEnv === 'development') {
 if (slackReviewer) {
   const slackRouter = slackReviewer.getRouter();
   logger.info('Mounting Slack router at /slack/events');
+  // ExpressReceiver router should be mounted at the path where Slack sends events
   app.use('/slack/events', slackRouter);
   logger.info('Slack router mounted successfully');
 }
