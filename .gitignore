@@ -7,3 +7,9 @@ dist/
 
 the-revenue-architects/
 .env.bak
+
+# Compiled files in api/ (Vercel compiles TypeScript on-the-fly)
+api/*.js
+api/*.js.map
+api/*.d.ts
+api/*.d.ts.map
