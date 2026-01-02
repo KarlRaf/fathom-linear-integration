@@ -193,8 +193,10 @@ export class SlackReviewer {
         if (this.linearCreator) {
           try {
             logger.info(`Attempting to create ${reviewData.linearIssues.length} issues in Linear...`);
+            console.log(`[LINEAR] Starting to create ${reviewData.linearIssues.length} issues...`);
             const issueIds = await this.linearCreator.createIssues(reviewData.linearIssues);
             logger.info(`Created ${issueIds.length}/${reviewData.linearIssues.length} issues in Linear:`, issueIds);
+            console.log(`[LINEAR] Created ${issueIds.length}/${reviewData.linearIssues.length} issues:`, issueIds);
             
             if (issueIds.length === 0) {
               // Update message to show error
@@ -241,6 +243,7 @@ export class SlackReviewer {
             logger.info(`Review ${reviewId} approved and issues created`);
           } catch (error) {
             logger.error('Failed to create Linear issues:', error);
+            console.error('[LINEAR] Failed to create Linear issues:', error);
             
             // Update message to show error
             if (messageTs && channelId) {
