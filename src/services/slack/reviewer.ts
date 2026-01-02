@@ -112,13 +112,38 @@ export class SlackReviewer {
         const actionBody = body as any;
         const reviewId = actionBody.actions[0]?.value;
         
+        // Extract message info from action body immediately for instant UI feedback
+        const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
+        const channelId = actionBody.channel?.id || actionBody.container?.channel_id;
+        
         if (!reviewId) {
           logger.error('No reviewId found in action body:', JSON.stringify(actionBody, null, 2));
           await respond({ text: '❌ Invalid review request.' });
           return;
         }
         
-        logger.info(`Processing approval for reviewId: ${reviewId}, useKV: ${this.useKV}`);
+        logger.info(`Processing approval for reviewId: ${reviewId}, useKV: ${this.useKV}, messageTs: ${messageTs}, channelId: ${channelId}`);
+        
+        // IMMEDIATELY update the message to show processing state and remove buttons
+        // This provides instant feedback and prevents multiple clicks
+        if (messageTs && channelId) {
+          try {
+            await this.app.client.chat.update({
+              channel: channelId,
+              ts: messageTs,
+              text: `⏳ Processing approval - Creating issues in Linear...`,
+              blocks: this.createProcessingBlocks('⏳ Processing approval - Creating issues in Linear...'),
+            });
+            logger.info('Updated message to show processing state immediately');
+          } catch (error) {
+            logger.warn('Failed to update message to processing state:', error);
+            // Continue anyway - send ephemeral response
+            await respond({ text: '⏳ Processing approval - Creating issues in Linear...' });
+          }
+        } else {
+          logger.warn('Missing messageTs or channelId in action body, cannot update message immediately');
+          await respond({ text: '⏳ Processing approval - Creating issues in Linear...' });
+        }
         
         // Get review data from KV or memory
         let reviewData: ReviewRequestData | null = null;
@@ -128,37 +153,35 @@ export class SlackReviewer {
         } else {
           // Fallback to in-memory storage (for local development)
           // This won't work in serverless, but helps with local testing
-          await respond({ text: '❌ In-memory storage not available. Use KV for serverless deployment.' });
+          if (messageTs && channelId) {
+            await this.app.client.chat.update({
+              channel: channelId,
+              ts: messageTs,
+              text: '❌ In-memory storage not available. Use KV for serverless deployment.',
+              blocks: this.createErrorBlocks('❌ In-memory storage not available. Use KV for serverless deployment.'),
+            });
+          } else {
+            await respond({ text: '❌ In-memory storage not available. Use KV for serverless deployment.' });
+          }
           return;
         }
 
         if (!reviewData) {
           logger.error(`Review data not found for reviewId: ${reviewId}`);
-          await respond({ text: '❌ Review not found or expired.' });
+          if (messageTs && channelId) {
+            await this.app.client.chat.update({
+              channel: channelId,
+              ts: messageTs,
+              text: `❌ Review not found or expired.`,
+              blocks: this.createErrorBlocks('❌ Review not found or expired.'),
+            });
+          } else {
+            await respond({ text: '❌ Review not found or expired.' });
+          }
           return;
         }
         
         logger.info(`Review data found for reviewId: ${reviewId}, proceeding with issue creation`);
-
-        // Immediately update the message to disable buttons and show loading state
-        // This prevents multiple clicks
-        if (reviewData.messageTs && reviewData.channelId) {
-          try {
-            await this.app.client.chat.update({
-              channel: reviewData.channelId,
-              ts: reviewData.messageTs,
-              text: `⏳ Processing approval - Creating issues in Linear...`,
-              blocks: this.createProcessingBlocks(reviewData),
-            });
-            logger.info('Updated message to show processing state');
-          } catch (error) {
-            logger.warn('Failed to update message to processing state:', error);
-            // Continue anyway - send ephemeral response
-            await respond({ text: '⏳ Processing approval - Creating issues in Linear...' });
-          }
-        } else {
-          await respond({ text: '⏳ Processing approval - Creating issues in Linear...' });
-        }
 
         // Create Linear issues
         if (this.linearCreator) {
@@ -169,11 +192,11 @@ export class SlackReviewer {
             
             if (issueIds.length === 0) {
               // Update message to show error
-              if (reviewData.messageTs && reviewData.channelId) {
+              if (messageTs && channelId) {
                 try {
                   await this.app.client.chat.update({
-                    channel: reviewData.channelId,
-                    ts: reviewData.messageTs,
+                    channel: channelId,
+                    ts: messageTs,
                     text: `❌ Failed to create issues in Linear`,
                     blocks: this.createErrorBlocks('Failed to create issues in Linear. Please check logs.'),
                   });
@@ -189,11 +212,11 @@ export class SlackReviewer {
             }
             
             // Update the original message with success
-            if (reviewData.messageTs && reviewData.channelId) {
+            if (messageTs && channelId) {
               try {
                 await this.app.client.chat.update({
-                  channel: reviewData.channelId,
-                  ts: reviewData.messageTs,
+                  channel: channelId,
+                  ts: messageTs,
                   text: `✅ Approved - Created ${issueIds.length} issue(s) in Linear`,
                   blocks: this.createApprovedBlocks(reviewData, issueIds.length),
                 });
@@ -214,11 +237,11 @@ export class SlackReviewer {
             logger.error('Failed to create Linear issues:', error);
             
             // Update message to show error
-            if (reviewData.messageTs && reviewData.channelId) {
+            if (messageTs && channelId) {
               try {
                 await this.app.client.chat.update({
-                  channel: reviewData.channelId,
-                  ts: reviewData.messageTs,
+                  channel: channelId,
+                  ts: messageTs,
                   text: `❌ Error creating issues in Linear`,
                   blocks: this.createErrorBlocks('Error creating issues in Linear. Please try again.'),
                 });
@@ -245,10 +268,29 @@ export class SlackReviewer {
         const actionBody = body as any;
         const reviewId = actionBody.actions[0]?.value;
         
+        // Extract message info from action body immediately for instant UI feedback
+        const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
+        const channelId = actionBody.channel?.id || actionBody.container?.channel_id;
+        
         if (!reviewId) {
           logger.error('No reviewId found in reject action body');
           await respond({ text: '❌ Invalid review request.' });
           return;
+        }
+        
+        // IMMEDIATELY update the message to show processing state and remove buttons
+        if (messageTs && channelId) {
+          try {
+            await this.app.client.chat.update({
+              channel: channelId,
+              ts: messageTs,
+              text: `⏳ Processing rejection...`,
+              blocks: this.createProcessingBlocks('⏳ Processing rejection...'),
+            });
+            logger.info('Updated message to show processing state for rejection');
+          } catch (error) {
+            logger.warn('Failed to update message to processing state for rejection:', error);
+          }
         }
         
         // Get review data from KV
@@ -259,16 +301,25 @@ export class SlackReviewer {
         }
 
         if (!reviewData) {
-          await respond({ text: '❌ Review not found or expired.' });
+          if (messageTs && channelId) {
+            await this.app.client.chat.update({
+              channel: channelId,
+              ts: messageTs,
+              text: `❌ Review not found or expired.`,
+              blocks: this.createErrorBlocks('❌ Review not found or expired.'),
+            });
+          } else {
+            await respond({ text: '❌ Review not found or expired.' });
+          }
           return;
         }
 
-        // Immediately update the original message to remove buttons
-        if (reviewData.messageTs && reviewData.channelId) {
+        // Update the original message
+        if (messageTs && channelId) {
           try {
             await this.app.client.chat.update({
-              channel: reviewData.channelId,
-              ts: reviewData.messageTs,
+              channel: channelId,
+              ts: messageTs,
               text: `❌ Rejected - Issues not created`,
               blocks: this.createRejectedBlocks(reviewData),
             });
@@ -504,13 +555,13 @@ export class SlackReviewer {
     return blocks;
   }
 
-  private createProcessingBlocks(review: ReviewRequestData): KnownBlock[] {
+  private createProcessingBlocks(message: string): KnownBlock[] {
     return [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `⏳ *Processing Approval*\n\nCreating ${review.linearIssues.length} issue(s) in Linear...\n\nPlease wait, this may take a moment.`,
+          text: message,
         },
       },
     ];
