@@ -42,16 +42,33 @@ export class LinearIssueCreator {
         }
       );
       
+      logger.debug(`Waiting for issue payload to resolve...`);
       const issue = await issuePayload.issue;
       
+      logger.debug(`Issue payload resolved, checking result...`, {
+        issue: issue ? 'exists' : 'null',
+        issueType: typeof issue,
+        issueKeys: issue ? Object.keys(issue) : [],
+      });
+      
       if (!issue) {
+        logger.error('Issue payload resolved but issue is null/undefined', {
+          issuePayload: JSON.stringify(issuePayload, null, 2),
+        });
         throw new Error('Failed to create issue: no issue returned');
+      }
+      
+      if (!issue.id) {
+        logger.error('Issue object exists but has no id', {
+          issue: JSON.stringify(issue, null, 2),
+        });
+        throw new Error('Failed to create issue: issue has no id');
       }
       
       logger.info(`Created Linear issue: ${issue.id} - ${issue.title}`, {
         issueId: issue.id,
         issueTitle: issue.title,
-        issueUrl: issue.url,
+        issueUrl: issue.url || 'N/A',
         teamId: input.teamId,
       });
       return issue.id;
