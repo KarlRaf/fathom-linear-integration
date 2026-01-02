@@ -34,8 +34,10 @@ const linearCreator = new LinearIssueCreator(config.linear.apiKey);
 let slackReviewer: SlackReviewer | undefined;
 try {
   if (config.slack.botToken && config.slack.signingSecret && config.slack.channelId) {
+    logger.info('Slack credentials found, initializing SlackReviewer...');
     // Use KV if KV environment variables are set (Vercel deployment)
     const useKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+    logger.info(`Using KV for state storage: ${useKV}`);
     slackReviewer = new SlackReviewer(
       config.slack.botToken,
       config.slack.signingSecret,
@@ -44,12 +46,14 @@ try {
     );
     // Set Linear creator for callback execution (required for KV mode)
     slackReviewer.setLinearCreator(linearCreator);
-    logger.info('Slack reviewer initialized');
+    logger.info('Slack reviewer initialized successfully');
   } else {
     logger.warn('Slack credentials not provided - Slack review feature will be disabled');
+    logger.debug(`Bot token: ${config.slack.botToken ? 'set' : 'missing'}, Signing secret: ${config.slack.signingSecret ? 'set' : 'missing'}, Channel ID: ${config.slack.channelId ? 'set' : 'missing'}`);
   }
 } catch (error) {
-  logger.warn('Failed to initialize Slack reviewer - Slack review feature will be disabled:', error);
+  logger.error('Failed to initialize Slack reviewer - Slack review feature will be disabled:', error);
+  logger.error('Error details:', error instanceof Error ? error.stack : String(error));
   slackReviewer = undefined;
 }
 
