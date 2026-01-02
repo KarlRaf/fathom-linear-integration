@@ -35,9 +35,12 @@ let slackReviewer: SlackReviewer | undefined;
 try {
   if (config.slack.botToken && config.slack.signingSecret && config.slack.channelId) {
     logger.info('Slack credentials found, initializing SlackReviewer...');
-    // Use KV if KV environment variables are set (Vercel deployment)
-    const useKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-    logger.info(`Using KV for state storage: ${useKV}`);
+    // Use KV if KV environment variables are set (supports both Vercel KV and Upstash Redis)
+    // @vercel/kv automatically detects both naming conventions, but we check for either
+    const hasKV = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+    const hasUpstash = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+    const useKV = hasKV || hasUpstash;
+    logger.info(`Using KV for state storage: ${useKV} (KV vars: ${hasKV}, Upstash vars: ${hasUpstash})`);
     slackReviewer = new SlackReviewer(
       config.slack.botToken,
       config.slack.signingSecret,
@@ -104,10 +107,13 @@ if (config.nodeEnv === 'development') {
 // Mount Slack Bolt receiver on the same Express server (only if Slack is configured)
 if (slackReviewer) {
   const slackRouter = slackReviewer.getRouter();
-  logger.info('Mounting Slack router');
-  // Try mounting at root - ExpressReceiver handles /slack/events internally
-  app.use(slackRouter);
-  logger.info('Slack router mounted successfully at root');
+  logger.info('Mounting Slack router at /slack/events');
+  // ExpressReceiver router should be mounted at the path where Slack sends events
+  app.use('/slack/events', slackRouter);
+  logger.info('Slack router mounted successfully');
+  
+  // Debug: Log the router to see what routes it has
+  logger.debug('Slack router stack:', (slackRouter as any).stack?.length || 'unknown');
 }
 
 // Error handling middleware
