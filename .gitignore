@@ -6,3 +6,4 @@ dist/
 *.tsbuildinfo
 
 the-revenue-architects/
+.env.bak
