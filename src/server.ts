@@ -108,6 +108,13 @@ if (config.nodeEnv === 'development') {
 if (slackReviewer) {
   const slackRouter = slackReviewer.getRouter();
   logger.info('Mounting Slack router at /slack/events');
+  
+  // Add middleware to log all requests to Slack router for debugging
+  app.use('/slack/events', (req, res, next) => {
+    logger.info(`Slack router request: ${req.method} ${req.path}`);
+    next();
+  });
+  
   // ExpressReceiver router should be mounted at the path where Slack sends events
   app.use('/slack/events', slackRouter);
   logger.info('Slack router mounted successfully');
