@@ -105,7 +105,7 @@ export class SlackReviewer {
   }
 
   private setupHandlers() {
-    this.app.action('approve_issues', async ({ ack, body, respond }) => {
+    this.app.action('approve_issues', async ({ ack, body, respond, update }) => {
       await ack();
       
       try {
@@ -140,6 +140,26 @@ export class SlackReviewer {
         
         logger.info(`Review data found for reviewId: ${reviewId}, proceeding with issue creation`);
 
+        // Immediately update the message to disable buttons and show loading state
+        // This prevents multiple clicks
+        if (reviewData.messageTs && reviewData.channelId) {
+          try {
+            await this.app.client.chat.update({
+              channel: reviewData.channelId,
+              ts: reviewData.messageTs,
+              text: `⏳ Processing approval - Creating issues in Linear...`,
+              blocks: this.createProcessingBlocks(reviewData),
+            });
+            logger.info('Updated message to show processing state');
+          } catch (error) {
+            logger.warn('Failed to update message to processing state:', error);
+            // Continue anyway - send ephemeral response
+            await respond({ text: '⏳ Processing approval - Creating issues in Linear...' });
+          }
+        } else {
+          await respond({ text: '⏳ Processing approval - Creating issues in Linear...' });
+        }
+
         // Create Linear issues
         if (this.linearCreator) {
           try {
@@ -148,6 +168,19 @@ export class SlackReviewer {
             logger.info(`Created ${issueIds.length}/${reviewData.linearIssues.length} issues in Linear:`, issueIds);
             
             if (issueIds.length === 0) {
+              // Update message to show error
+              if (reviewData.messageTs && reviewData.channelId) {
+                try {
+                  await this.app.client.chat.update({
+                    channel: reviewData.channelId,
+                    ts: reviewData.messageTs,
+                    text: `❌ Failed to create issues in Linear`,
+                    blocks: this.createErrorBlocks('Failed to create issues in Linear. Please check logs.'),
+                  });
+                } catch (error) {
+                  logger.warn('Failed to update message with error:', error);
+                }
+              }
               await respond({ 
                 text: `❌ Failed to create issues in Linear. Please check logs.`,
                 replace_original: false 
@@ -155,30 +188,45 @@ export class SlackReviewer {
               return;
             }
             
-            await respond({ 
-              text: `✅ Approved! Created ${issueIds.length} issue(s) in Linear.`,
-              replace_original: false 
-            });
-            
-            // Update the original message
+            // Update the original message with success
             if (reviewData.messageTs && reviewData.channelId) {
               try {
                 await this.app.client.chat.update({
                   channel: reviewData.channelId,
                   ts: reviewData.messageTs,
-                  text: `✅ Approved - Issues created in Linear`,
-                  blocks: this.createApprovedBlocks(reviewData),
+                  text: `✅ Approved - Created ${issueIds.length} issue(s) in Linear`,
+                  blocks: this.createApprovedBlocks(reviewData, issueIds.length),
                 });
               } catch (error) {
                 logger.warn('Failed to update original message:', error);
               }
             }
             
+            await respond({ 
+              text: `✅ Approved! Created ${issueIds.length} issue(s) in Linear.`,
+              replace_original: false 
+            });
+            
             // Delete from KV
             await this.deleteReviewKV(reviewId);
             logger.info(`Review ${reviewId} approved and issues created`);
           } catch (error) {
             logger.error('Failed to create Linear issues:', error);
+            
+            // Update message to show error
+            if (reviewData.messageTs && reviewData.channelId) {
+              try {
+                await this.app.client.chat.update({
+                  channel: reviewData.channelId,
+                  ts: reviewData.messageTs,
+                  text: `❌ Error creating issues in Linear`,
+                  blocks: this.createErrorBlocks('Error creating issues in Linear. Please try again.'),
+                });
+              } catch (updateError) {
+                logger.warn('Failed to update message with error:', updateError);
+              }
+            }
+            
             await respond({ text: '❌ Error creating issues in Linear. Please try again.' });
           }
         } else {
@@ -195,7 +243,13 @@ export class SlackReviewer {
       
       try {
         const actionBody = body as any;
-        const reviewId = actionBody.actions[0].value;
+        const reviewId = actionBody.actions[0]?.value;
+        
+        if (!reviewId) {
+          logger.error('No reviewId found in reject action body');
+          await respond({ text: '❌ Invalid review request.' });
+          return;
+        }
         
         // Get review data from KV
         let reviewData: ReviewRequestData | null = null;
@@ -209,7 +263,7 @@ export class SlackReviewer {
           return;
         }
 
-        // Update the original message
+        // Immediately update the original message to remove buttons
         if (reviewData.messageTs && reviewData.channelId) {
           try {
             await this.app.client.chat.update({
@@ -450,13 +504,38 @@ export class SlackReviewer {
     return blocks;
   }
 
-  private createApprovedBlocks(review: ReviewRequestData): KnownBlock[] {
+  private createProcessingBlocks(review: ReviewRequestData): KnownBlock[] {
     return [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `✅ *Approved*\n\nCreated ${review.linearIssues.length} issue(s) in Linear.`,
+          text: `⏳ *Processing Approval*\n\nCreating ${review.linearIssues.length} issue(s) in Linear...\n\nPlease wait, this may take a moment.`,
+        },
+      },
+    ];
+  }
+
+  private createApprovedBlocks(review: ReviewRequestData, issueCount?: number): KnownBlock[] {
+    const count = issueCount || review.linearIssues.length;
+    return [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `✅ *Approved*\n\nCreated ${count} issue(s) in Linear.`,
+        },
+      },
+    ];
+  }
+
+  private createErrorBlocks(errorMessage: string): KnownBlock[] {
+    return [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `❌ *Error*\n\n${errorMessage}`,
         },
       },
     ];
