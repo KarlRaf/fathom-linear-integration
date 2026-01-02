@@ -105,7 +105,7 @@ export class SlackReviewer {
   }
 
   private setupHandlers() {
-    this.app.action('approve_issues', async ({ ack, body, respond, update }) => {
+    this.app.action('approve_issues', async ({ ack, body, respond }) => {
       await ack();
       
       try {
