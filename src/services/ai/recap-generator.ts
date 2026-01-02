@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { logger } from '../../utils/logger';
+import { retry } from '../../utils/retry';
 import { FathomWebhookPayload } from '../../types/fathom';
 
 const RECAP_PROMPT = `You are an expert RevOps + GTM meeting note-taker. Convert messy meeting transcripts into a Slack-friendly recap in a specific emoji-led format.

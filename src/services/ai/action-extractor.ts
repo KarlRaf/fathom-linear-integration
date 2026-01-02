@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { logger } from '../../utils/logger';
+import { retry } from '../../utils/retry';
 import { ActionItem, ActionItemExtractionResult } from '../../types/action-item';
 
 const EXTRACTION_PROMPT = `You are an assistant that extracts action items from meeting transcripts.
@@ -57,21 +58,37 @@ export class ActionItemExtractor {
     try {
       logger.info('Extracting action items using OpenAI...');
       
-      const response = await this.client.chat.completions.create({
-        model: 'gpt-5-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that extracts action items from meeting transcripts. Always return valid JSON only, no additional text.',
+      // Use retry logic for OpenAI API calls (handles transient failures)
+      const response = await retry(
+        () => this.client.chat.completions.create({
+          model: 'gpt-5-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that extracts action items from meeting transcripts. Always return valid JSON only, no additional text.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          response_format: { type: 'json_object' },
+          // gpt-5-mini doesn't support custom temperature, uses default (1)
+        }),
+        {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+          maxDelayMs: 5000,
+          retryableErrors: (error) => {
+            // Retry on network errors, timeouts, and rate limits
+            if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') return true;
+            if (error.status === 429) return true; // Rate limit
+            if (error.status >= 500) return true; // Server errors
+            if (error.message?.includes('timeout')) return true;
+            return false;
           },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        response_format: { type: 'json_object' },
-        // gpt-5-mini doesn't support custom temperature, uses default (1)
-      });
+        }
+      );
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
@@ -84,7 +101,7 @@ export class ActionItemExtractor {
       logger.info(`Extracted ${actionItems.length} action items`);
       return actionItems;
     } catch (error) {
-      logger.error('Failed to extract action items:', error);
+      logger.error('Failed to extract action items after retries:', error);
       throw new Error(`Action item extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
