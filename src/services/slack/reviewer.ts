@@ -113,8 +113,11 @@ export class SlackReviewer {
         const reviewId = actionBody.actions[0]?.value;
         
         // Extract message info from action body immediately for instant UI feedback
+        // Slack Bolt provides this in body.message.ts and body.channel.id
         const messageTs = actionBody.message?.ts || actionBody.container?.message_ts;
         const channelId = actionBody.channel?.id || actionBody.container?.channel_id;
+        
+        logger.info(`Action body structure - message: ${JSON.stringify(actionBody.message)}, channel: ${JSON.stringify(actionBody.channel)}, container: ${JSON.stringify(actionBody.container)}`);
         
         if (!reviewId) {
           logger.error('No reviewId found in action body:', JSON.stringify(actionBody, null, 2));
