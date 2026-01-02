@@ -59,8 +59,9 @@ export class SlackReviewer {
     if (!this.useKV) return;
     try {
       const key = this.getKVKey(reviewId);
+      logger.info(`Storing review in KV with key: ${key}, reviewId: ${reviewId}`);
       await kv.set(key, JSON.stringify(data), { ex: Math.floor(this.reviewTimeout / 1000) }); // TTL in seconds
-      logger.debug(`Stored review ${reviewId} in KV`);
+      logger.info(`Successfully stored review ${reviewId} in KV with key: ${key}`);
     } catch (error) {
       logger.error(`Failed to store review ${reviewId} in KV:`, error);
       throw error;
@@ -71,8 +72,13 @@ export class SlackReviewer {
     if (!this.useKV) return null;
     try {
       const key = this.getKVKey(reviewId);
+      logger.info(`Looking up review in KV with key: ${key}`);
       const data = await kv.get<string>(key);
-      if (!data) return null;
+      if (!data) {
+        logger.warn(`Review data not found in KV for key: ${key}`);
+        return null;
+      }
+      logger.info(`Review data found in KV for key: ${key}`);
       return JSON.parse(data) as ReviewRequestData;
     } catch (error) {
       logger.error(`Failed to get review ${reviewId} from KV:`, error);
@@ -97,7 +103,15 @@ export class SlackReviewer {
       
       try {
         const actionBody = body as any;
-        const reviewId = actionBody.actions[0].value;
+        const reviewId = actionBody.actions[0]?.value;
+        
+        if (!reviewId) {
+          logger.error('No reviewId found in action body:', JSON.stringify(actionBody, null, 2));
+          await respond({ text: '❌ Invalid review request.' });
+          return;
+        }
+        
+        logger.info(`Processing approval for reviewId: ${reviewId}, useKV: ${this.useKV}`);
         
         // Get review data from KV or memory
         let reviewData: ReviewRequestData | null = null;
@@ -112,9 +126,12 @@ export class SlackReviewer {
         }
 
         if (!reviewData) {
+          logger.error(`Review data not found for reviewId: ${reviewId}`);
           await respond({ text: '❌ Review not found or expired.' });
           return;
         }
+        
+        logger.info(`Review data found for reviewId: ${reviewId}, proceeding with issue creation`);
 
         // Create Linear issues
         if (this.linearCreator) {
