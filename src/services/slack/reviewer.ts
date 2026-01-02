@@ -26,6 +26,7 @@ export class SlackReviewer {
   constructor(botToken: string, signingSecret: string, channelId: string, useKV: boolean = false) {
     this.receiver = new ExpressReceiver({
       signingSecret,
+      endpoints: '/slack/events',
     });
     
     this.app = new App({
