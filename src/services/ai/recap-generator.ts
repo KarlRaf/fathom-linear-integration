@@ -70,20 +70,36 @@ export class RecapGenerator {
     try {
       logger.info('Generating Slack recap using OpenAI...');
       
-      const response = await this.client.chat.completions.create({
-        model: 'gpt-5-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert RevOps + GTM meeting note-taker. Generate Slack-friendly recaps in emoji-led format. Return ONLY the Slack recap, no other content.',
+      // Use retry logic for OpenAI API calls (handles transient failures)
+      const response = await retry(
+        () => this.client.chat.completions.create({
+          model: 'gpt-5-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert RevOps + GTM meeting note-taker. Generate Slack-friendly recaps in emoji-led format. Return ONLY the Slack recap, no other content.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          // gpt-5-mini doesn't support custom temperature, uses default (1)
+        }),
+        {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+          maxDelayMs: 5000,
+          retryableErrors: (error) => {
+            // Retry on network errors, timeouts, and rate limits
+            if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') return true;
+            if (error.status === 429) return true; // Rate limit
+            if (error.status >= 500) return true; // Server errors
+            if (error.message?.includes('timeout')) return true;
+            return false;
           },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        // gpt-5-mini doesn't support custom temperature, uses default (1)
-      });
+        }
+      );
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
@@ -96,7 +112,7 @@ export class RecapGenerator {
       logger.info('Slack recap generated successfully');
       return recap;
     } catch (error) {
-      logger.error('Failed to generate recap:', error);
+      logger.error('Failed to generate recap after retries:', error);
       throw new Error(`Recap generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
