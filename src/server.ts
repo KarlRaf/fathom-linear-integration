@@ -103,7 +103,10 @@ if (config.nodeEnv === 'development') {
 
 // Mount Slack Bolt receiver on the same Express server (only if Slack is configured)
 if (slackReviewer) {
-  app.use('/slack/events', slackReviewer.getRouter());
+  const slackRouter = slackReviewer.getRouter();
+  logger.info('Mounting Slack router at /slack/events');
+  app.use('/slack/events', slackRouter);
+  logger.info('Slack router mounted successfully');
 }
 
 // Error handling middleware
