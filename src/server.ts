@@ -105,22 +105,25 @@ if (config.nodeEnv === 'development') {
 }
 
 // Mount Slack Bolt receiver on the same Express server (only if Slack is configured)
+// ExpressReceiver's router handles /slack/events internally, so mount at root
 if (slackReviewer) {
   const slackRouter = slackReviewer.getRouter();
-  logger.info('Mounting Slack router at /slack/events');
+  logger.info('Mounting Slack router (ExpressReceiver handles /slack/events internally)');
   
-  // Add middleware to log all requests to Slack router for debugging
-  app.use('/slack/events', (req, res, next) => {
-    logger.info(`Slack router request: ${req.method} ${req.path}`);
+  // Add middleware to log all requests for debugging
+  app.use((req, res, next) => {
+    if (req.path === '/slack/events' || req.path.startsWith('/slack/')) {
+      logger.info(`Slack request: ${req.method} ${req.path}`, {
+        hasBody: !!req.body,
+        contentType: req.headers['content-type']
+      });
+    }
     next();
   });
   
-  // ExpressReceiver router should be mounted at the path where Slack sends events
-  app.use('/slack/events', slackRouter);
+  // Mount ExpressReceiver router at root - it handles /slack/events internally
+  app.use(slackRouter);
   logger.info('Slack router mounted successfully');
-  
-  // Debug: Log the router to see what routes it has
-  logger.debug('Slack router stack:', (slackRouter as any).stack?.length || 'unknown');
 }
 
 // Error handling middleware

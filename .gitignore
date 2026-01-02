@@ -13,3 +13,5 @@ api/*.js
 api/*.js.map
 api/*.d.ts
 api/*.d.ts.map
+.vercel
+.env*.local
