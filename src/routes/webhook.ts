@@ -23,18 +23,48 @@ export function createWebhookRouter(services: {
   router.post('/fathom', async (req: Request, res: Response) => {
     try {
       // Get raw body for signature verification
-      // The raw body should be stored in req.rawBody by middleware
-      const rawBody = (req as any).rawBody || JSON.stringify(req.body);
-      const signature = req.headers['webhook-signature'] as string;
+      // In Vercel serverless, the raw body might be in req.rawBody or we need to reconstruct it
+      let rawBody = (req as any).rawBody;
+      
+      // If rawBody is not available, try to reconstruct it from the parsed body
+      // This is a fallback for Vercel serverless functions
+      if (!rawBody && req.body) {
+        rawBody = JSON.stringify(req.body);
+        logger.debug('Reconstructed rawBody from parsed body', { bodyKeys: Object.keys(req.body) });
+      }
+      
+      if (!rawBody) {
+        logger.error('Unable to get raw body for signature verification');
+        return res.status(400).json({ error: 'Missing request body' });
+      }
+
+      // Check multiple possible header names for signature
+      const signature = 
+        (req.headers['webhook-signature'] as string) ||
+        (req.headers['x-fathom-signature'] as string) ||
+        (req.headers['x-webhook-signature'] as string);
+
+      logger.debug('Webhook request received', {
+        hasSignature: !!signature,
+        signatureHeader: signature ? signature.substring(0, 20) + '...' : 'missing',
+        rawBodyLength: rawBody.length,
+        contentType: req.headers['content-type'],
+        allHeaders: Object.keys(req.headers),
+      });
 
       if (!signature) {
-        logger.warn('Missing webhook signature header');
+        logger.warn('Missing webhook signature header', {
+          availableHeaders: Object.keys(req.headers).filter(h => h.toLowerCase().includes('signature') || h.toLowerCase().includes('webhook')),
+        });
         return res.status(401).json({ error: 'Missing webhook signature' });
       }
 
       // Verify webhook signature
       if (!verifyWebhookSignature(config.fathom.webhookSecret, signature, rawBody)) {
-        logger.warn('Invalid webhook signature');
+        logger.warn('Invalid webhook signature', {
+          secretLength: config.fathom.webhookSecret?.length || 0,
+          signatureLength: signature.length,
+        });
         return res.status(401).json({ error: 'Invalid signature' });
       }
 
