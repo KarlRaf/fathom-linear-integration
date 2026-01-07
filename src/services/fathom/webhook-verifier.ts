@@ -7,6 +7,12 @@ export function verifyWebhookSignature(
   rawBody: string
 ): boolean {
   try {
+    // Fathom provides secrets in the format "<keyId>.<signingSecret>"
+    // Only the part after the dot should be used for HMAC
+    const signingSecret = typeof secret === 'string' && secret.includes('.')
+      ? secret.split('.')[1]
+      : secret;
+
     logger.debug('Verifying webhook signature', {
       signatureLength: signature?.length || 0,
       rawBodyLength: rawBody?.length || 0,
@@ -31,7 +37,7 @@ export function verifyWebhookSignature(
     }
 
     const expected = crypto
-      .createHmac('sha256', secret)
+      .createHmac('sha256', signingSecret)
       .update(rawBody, 'utf8')
       .digest('base64');
 

@@ -9,17 +9,21 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables
+// Load environment variables (try .env.local first, then .env)
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const VERCEL_URL = process.env.VERCEL_URL || 'https://fathom-linear-integration.vercel.app';
-const WEBHOOK_SECRET = process.env.FATHOM_WEBHOOK_SECRET || process.env.FATHOM_WEBHOOK_SECRET;
+const RAW_SECRET = process.env.FATHOM_WEBHOOK_SECRET || process.env.FATHOM_WEBHOOK_SECRET;
 
-if (!WEBHOOK_SECRET) {
+if (!RAW_SECRET) {
   console.error('❌ FATHOM_WEBHOOK_SECRET not found in environment variables');
   console.error('   Please set it in .env.local or export it');
   process.exit(1);
 }
+
+// Use only the signing secret part after the dot if present: "<keyId>.<signingSecret>"
+const WEBHOOK_SECRET = RAW_SECRET.includes('.') ? RAW_SECRET.split('.')[1] : RAW_SECRET;
 
 const mockPayloadPath = path.join(__dirname, '..', 'mock-webhook-payload.json');
 
