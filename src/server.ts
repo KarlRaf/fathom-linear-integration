@@ -64,8 +64,10 @@ try {
 const app = express();
 
 // Middleware: Parse JSON with raw body preservation for webhook verification
+// Increased limit to 10MB to handle large Fathom webhook payloads (transcripts can be large)
 app.use(
   express.json({
+    limit: '10mb', // Increased from default 100kb to handle large transcripts
     verify: (req: any, res, buf) => {
       // Store raw body for webhook signature verification
       req.rawBody = buf.toString('utf8');
