@@ -7,12 +7,6 @@ export function verifyWebhookSignature(
   rawBody: string
 ): boolean {
   try {
-    // Fathom provides secrets in the format "<keyId>.<signingSecret>"
-    // Only the part after the dot should be used for HMAC
-    const signingSecret = typeof secret === 'string' && secret.includes('.')
-      ? secret.split('.')[1]
-      : secret;
-
     logger.debug('Verifying webhook signature', {
       signatureLength: signature?.length || 0,
       rawBodyLength: rawBody?.length || 0,
@@ -36,23 +30,50 @@ export function verifyWebhookSignature(
       return false;
     }
 
-    const expected = crypto
-      .createHmac('sha256', signingSecret)
-      .update(rawBody, 'utf8')
-      .digest('base64');
-
     // Fathom may send signature as single value or space-separated
     const signatures = signatureBlock.split(' ').map(s => s.trim()).filter(s => s.length > 0);
-    const isValid = signatures.includes(expected);
+    const receivedSet = new Set(signatures);
+
+    // Fathom secret is sometimes formatted as "<keyId>.<signingSecret>".
+    // Different docs/tools in the wild may refer to either the full string or the signingSecret part.
+    // To be robust, try all plausible key variants.
+    const secretStr = String(secret || '');
+    const dotParts = secretStr.includes('.') ? secretStr.split('.') : null;
+    const keyCandidates = Array.from(
+      new Set(
+        [
+          secretStr,
+          dotParts?.[0],
+          dotParts?.[1],
+        ].filter((v): v is string => typeof v === 'string' && v.length > 0)
+      )
+    );
+
+    const expectedByKey = keyCandidates.map((key) => {
+      const expected = crypto
+        .createHmac('sha256', key)
+        .update(rawBody, 'utf8')
+        .digest('base64');
+      return { key, expected };
+    });
+
+    const matched = expectedByKey.find(({ expected }) => receivedSet.has(expected));
+    const isValid = !!matched;
     
     if (!isValid) {
       logger.warn('Webhook signature verification failed', {
-        expected: expected.substring(0, 20) + '...',
+        expectedCandidates: expectedByKey.map(({ key, expected }) => ({
+          keyType: key === secretStr ? 'full' : (dotParts?.[0] === key ? 'beforeDot' : (dotParts?.[1] === key ? 'afterDot' : 'other')),
+          keyLength: key.length,
+          expected: expected.substring(0, 20) + '...',
+        })),
         received: signatures.map(s => s.substring(0, 20) + '...'),
         rawBodyPreview: rawBody.substring(0, 100),
       });
     } else {
-      logger.debug('Webhook signature verified successfully');
+      logger.debug('Webhook signature verified successfully', {
+        matchedKeyType: matched!.key === secretStr ? 'full' : (dotParts?.[0] === matched!.key ? 'beforeDot' : (dotParts?.[1] === matched!.key ? 'afterDot' : 'other')),
+      });
     }
     
     return isValid;
