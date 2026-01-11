@@ -15,3 +15,6 @@ api/*.d.ts
 api/*.d.ts.map
 .vercel
 .env*.local
+.env*
+.next/
+*.log
