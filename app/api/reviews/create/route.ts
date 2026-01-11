@@ -114,6 +114,11 @@ export async function POST(request: NextRequest) {
         
         // Create a mock payload for GitHub logging
         const mockPayload = {
+          event: {
+            id: `manual_${Date.now()}`,
+            event_type: 'recording.completed',
+            timestamp: new Date().toISOString(),
+          },
           recording: {
             id: `manual_${Date.now()}`,
             title: finalMeetingTitle,
