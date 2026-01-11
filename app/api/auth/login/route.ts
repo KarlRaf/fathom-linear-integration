@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 export async function POST(request: NextRequest) {
   try {
     const { password } = await request.json();
-    const ADMIN_PASSWORD = getAdminPassword();
+    // Read ADMIN_PASSWORD at runtime to ensure it's fresh from environment
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
     if (!ADMIN_PASSWORD) {
       return NextResponse.json(
