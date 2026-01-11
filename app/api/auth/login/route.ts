@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!password || password !== ADMIN_PASSWORD) {
+    // Trim whitespace from both password input and env var to handle copy-paste issues
+    if (!password || password.trim() !== ADMIN_PASSWORD.trim()) {
       return NextResponse.json(
         { error: 'Invalid password' },
         { status: 401 }
