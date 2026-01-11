@@ -53,7 +53,12 @@ export async function POST(request: NextRequest) {
     
     // Get Linear config and create transformer
     const linearConfig = await getLinearConfig();
-    const linearTransformer = new LinearTransformer(linearConfig);
+    const linearTransformer = new LinearTransformer(
+      linearConfig.apiKey,
+      linearConfig.teamId,
+      linearConfig.projectId,
+      linearConfig.stateId
+    );
     
     // Transform to Linear format
     let linearIssues;
