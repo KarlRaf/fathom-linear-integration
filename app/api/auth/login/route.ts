@@ -7,6 +7,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 export async function POST(request: NextRequest) {
   try {
     const { password } = await request.json();
+    const ADMIN_PASSWORD = getAdminPassword();
 
     if (!ADMIN_PASSWORD) {
       return NextResponse.json(
@@ -14,6 +15,19 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Debug logging (remove in production)
+    console.log('Password check:', {
+      inputLength: password?.length,
+      storedLength: ADMIN_PASSWORD.length,
+      inputFirstChar: password?.[0],
+      storedFirstChar: ADMIN_PASSWORD[0],
+      inputLastChar: password?.[password?.length - 1],
+      storedLastChar: ADMIN_PASSWORD[ADMIN_PASSWORD.length - 1],
+      inputTrimmed: password?.trim(),
+      storedTrimmed: ADMIN_PASSWORD.trim(),
+      match: password?.trim() === ADMIN_PASSWORD.trim(),
+    });
 
     // Trim whitespace from both password input and env var to handle copy-paste issues
     if (!password || password.trim() !== ADMIN_PASSWORD.trim()) {
