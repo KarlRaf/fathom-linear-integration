@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Fathom-Linear Integration Settings',
-  description: 'Configure webhook URL and AI prompts',
+  title: 'Meet2Issue — Turn Conversations Into Action',
+  description: 'Automatically convert Fathom call transcripts into Linear issues using AI. Streamline your meeting follow-up with intelligent action item extraction.',
 };
 
 export default function RootLayout({
