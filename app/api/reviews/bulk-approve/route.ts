@@ -14,6 +14,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Get Linear config
+    const linearConfig = await getLinearConfig();
+    const linearClient = new LinearClient({ apiKey: linearConfig.apiKey });
+    
     const results = [];
     for (const reviewId of reviewIds) {
       try {
