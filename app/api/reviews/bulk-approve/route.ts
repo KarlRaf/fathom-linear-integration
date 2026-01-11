@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { reviewStorage } from '../../../../src/services/review/review-storage';
 import { LinearIssueCreator } from '../../../../src/services/linear/client';
-import { LinearTransformer } from '../../../../src/services/linear/transformer';
 import { config } from '../../../../src/config/env';
 
 const linearClient = new LinearIssueCreator(config.linear.apiKey);
-const linearTransformer = new LinearTransformer(config.linear);
 
 export async function POST(request: NextRequest) {
   await initServices();
