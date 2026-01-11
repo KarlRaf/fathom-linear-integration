@@ -15,6 +15,8 @@
 
 ## Deployment Instructions
 
+**Important:** The landing page links to `/login` which assumes it's deployed on the same domain as the Next.js application. If deploying separately, update the login links to use the full application URL (e.g., `https://your-app.vercel.app/login`).
+
 ### Option 1: GitHub Pages
 
 1. Create a `docs` folder or use the root directory
