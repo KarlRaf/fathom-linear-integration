@@ -3,11 +3,11 @@ import { ActionItemExtractor } from '../../../../src/services/ai/action-extracto
 import { LinearTransformer } from '../../../../src/services/linear/transformer';
 import { reviewStorage } from '../../../../src/services/review/review-storage';
 import { GitHubLogger } from '../../../../src/services/github/logger';
+import { getLinearConfig } from '../../../../src/utils/linear-config';
 import { config } from '../../../../src/config/env';
 import { logger } from '../../../../src/utils/logger';
 
 const actionExtractor = new ActionItemExtractor(config.openai.apiKey);
-const linearTransformer = new LinearTransformer(config.linear);
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,6 +50,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Get Linear config and create transformer
+    const linearConfig = await getLinearConfig();
+    const linearTransformer = new LinearTransformer(
+      linearConfig.apiKey,
+      linearConfig.teamId,
+      linearConfig.projectId,
+      linearConfig.stateId
+    );
     
     // Transform to Linear format
     let linearIssues;
