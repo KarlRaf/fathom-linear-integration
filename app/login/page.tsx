@@ -26,25 +26,30 @@ function LoginForm() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/check', {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      
-      if (data.authenticated) {
-        // Already logged in, redirect to home or redirect URL
-        const redirect = searchParams.get('redirect') || '/';
-        router.push(redirect);
-      } else {
-        setChecking(false);
-      }
-    } catch (error) {
-      console.error('Auth check error:', error);
-      setChecking(false);
-    }
-  };
+          const checkAuth = async () => {
+            try {
+              const response = await fetch('/api/auth/check', {
+                credentials: 'include',
+              });
+              const data = await response.json();
+              
+              if (data.authenticated) {
+                // Already logged in, redirect to reviews page or redirect URL
+                // Don't redirect to '/' (landing page) for authenticated users
+                const redirect = searchParams.get('redirect');
+                if (redirect && redirect !== '/') {
+                  router.push(redirect);
+                } else {
+                  router.push('/reviews'); // Redirect to reviews page instead of landing page
+                }
+              } else {
+                setChecking(false);
+              }
+            } catch (error) {
+              console.error('Auth check error:', error);
+              setChecking(false);
+            }
+          };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,10 +70,14 @@ function LoginForm() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Redirect to home or the redirect URL
-      // Use router.push for client-side navigation (cookies are sent automatically)
-      const redirect = searchParams.get('redirect') || '/';
-      router.push(redirect);
+              // Redirect to reviews page or the redirect URL
+              // Don't redirect to '/' (landing page) for authenticated users
+              const redirect = searchParams.get('redirect');
+              if (redirect && redirect !== '/') {
+                router.push(redirect);
+              } else {
+                router.push('/reviews'); // Redirect to reviews page instead of landing page
+              }
     } catch (err) {
       setMessage({ 
         type: 'error', 
