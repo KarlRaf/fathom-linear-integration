@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         
         for (const issueInput of issuesToCreate) {
           try {
-            const issuePayload = await linearClient.createIssue({
+            const issue = await linearClient.createIssue({
               teamId: issueInput.teamId,
               title: issueInput.title,
               description: issueInput.description,
@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
               stateId: issueInput.stateId,
             });
             
-            const issue = await issuePayload.issue;
             if (issue?.id && issue?.url) {
               createdIssues.push({
                 id: issue.id,
