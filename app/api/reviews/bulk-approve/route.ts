@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
               stateId: issueInput.stateId,
             });
             
+            const issue = await issuePayload.issue;
             if (issue?.id && issue?.url) {
               createdIssues.push({
                 id: issue.id,
