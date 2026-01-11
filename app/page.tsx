@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 export default function LandingPage() {
   return (
     <div className="bg-gray-50">
@@ -18,12 +16,12 @@ export default function LandingPage() {
               reviews them in Slack, and creates Linear issues—so you never lose track of what needs to be done.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link 
+              <a 
                 href="/login"
-                className="bg-white text-indigo-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+                className="bg-white text-indigo-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors shadow-lg inline-block text-center"
               >
                 Try It Now
-              </Link>
+              </a>
               <a 
                 href="https://github.com/KarlRaf/fathom-linear-integration"
                 className="bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-indigo-800 transition-colors border-2 border-white/20"
