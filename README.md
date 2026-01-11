@@ -1,162 +1,288 @@
-# Fathom to Linear Integration
+# Fathom-Linear Integration
 
-Automatically convert call transcripts from Fathom into Linear issues based on extracted action items.
+A serverless application that automatically extracts action items from Fathom meeting transcripts and creates Linear issues. Features a web-based interface for reviewing, managing, and configuring the integration.
 
-## Overview
+## Features
 
-This application automatically converts Fathom call transcripts into Linear issues with AI-powered action item extraction and Slack review:
+- **Automated Action Item Extraction**: Uses OpenAI to extract action items from Fathom meeting transcripts
+- **Linear Integration**: Automatically creates Linear issues from extracted action items
+- **Web-based Review Interface**: Review and manage action items before creating Linear issues
+- **Configurable Prompts**: Edit AI prompts via the web interface without redeploying
+- **Settings Management**: Configure webhook URL, Linear credentials, and AI prompts through the UI
+- **Manual Review Creation**: Create reviews by pasting meeting transcripts
+- **Bulk Operations**: Approve, reject, or delete multiple reviews at once
+- **GitHub Logging**: Optional logging of transcripts to GitHub repository
+- **Secure Authentication**: Password-protected web interface
 
-1. Receives call transcripts from Fathom via webhooks
-2. Extracts action items using AI (OpenAI GPT-5-mini)
-3. **Posts a meeting recap to Slack** (informational)
-4. Transforms action items into Linear issues
-5. **Posts issues to Slack for individual review** (each issue has its own approve/reject buttons)
-6. Creates issues in Linear one-by-one as they're approved
-7. Logs all transcripts to GitHub with domain-based organization
+## Architecture
 
-## Documentation
+- **Backend**: Express.js server for webhook handling
+- **Frontend**: Next.js 14 with App Router for the web interface
+- **Storage**: Vercel KV for persistent storage of settings and reviews
+- **Deployment**: Vercel (serverless functions)
 
-- **[Architecture Plan](./ARCHITECTURE_PLAN.md)** - High-level system design, components, and data flow
-- **[Technical Specification](./TECHNICAL_SPEC.md)** - Detailed implementation guide with code examples
-
-## Quick Start
+## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- API keys for:
-  - Fathom (webhook secret)
-  - GitHub (personal access token)
-  - OpenAI or Anthropic
-  - Linear (API key)
-  - Slack (optional, for review workflow)
+- Vercel account
+- OpenAI API key
+- Linear API key
+- (Optional) GitHub token for transcript logging
 
-### Setup
+### Environment Variables
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env` and fill in your credentials
-4. Run the server: `npm run dev`
+Create a `.env` file or set these in Vercel:
+
+```bash
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Linear
+LINEAR_API_KEY=lin_api_...
+LINEAR_TEAM_ID=...
+LINEAR_PROJECT_ID=... # Optional
+LINEAR_STATE_ID=... # Optional
+
+# Authentication
+ADMIN_PASSWORD=your-secure-password
+JWT_SECRET=your-jwt-secret-key
+
+# Vercel KV (automatically configured if using Vercel KV)
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
+KV_REST_API_READ_ONLY_TOKEN=...
+
+# GitHub (Optional)
+GITHUB_TOKEN=... # Optional, for transcript logging
+GITHUB_REPO_OWNER=... # Optional
+GITHUB_REPO_NAME=... # Optional
+
+# Fathom Webhook
+FATHOM_WEBHOOK_SECRET=... # Your Fathom webhook signing secret
+```
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/your-username/fathom-linear-integration.git
+cd fathom-linear-integration
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables (see above)
+
+4. Deploy to Vercel:
+```bash
+vercel
+```
+
+Or push to GitHub and connect your repository to Vercel for automatic deployments.
 
 ### Configuration
 
-See [Setup Guide](./SETUP.md) for detailed setup instructions, or [Technical Specification](./TECHNICAL_SPEC.md) for implementation details.
+After deployment, access the web interface and configure:
 
-## Features
+1. **Settings Page** (`/settings`):
+   - Fathom webhook URL
+   - AI prompts (extraction and recap)
+   - Linear credentials (API key, team ID, project ID, state ID, assignee)
+   - Test prompts with preview functionality
 
-- ✅ **Webhook signature verification** (HMAC SHA-256)
-- ✅ **AI-powered action item extraction** (OpenAI GPT-5-mini)
-- ✅ **Slack recap messages** - Automatic meeting summaries posted to Slack
-- ✅ **Individual issue approval** - Each issue has its own approve/reject buttons for granular control
-- ✅ **Linear issue creation** - Proper formatting, priorities, assignees, and state management (Triage)
-- ✅ **GitHub transcript logging** - Domain-based organization (`call_transcript/{domain}/{date}/`)
-- ✅ **Vercel KV integration** - Persistent state storage for serverless deployment
-- ✅ **Retry strategy** - Exponential backoff for API calls (Linear, OpenAI)
-- ✅ **Comprehensive error handling** - Detailed logging and error recovery
-- ✅ **Type-safe** TypeScript implementation
-- ✅ **Vercel deployment ready** - Optimized for serverless functions
+2. **Reviews Page** (`/reviews`):
+   - View all reviews (pending, approved, rejected)
+   - Filter by status
+   - Bulk operations (approve, reject, delete)
 
-## Architecture
+3. **Manual Review Creation** (`/reviews/create`):
+   - Paste meeting transcripts
+   - Add domain for GitHub categorization
+   - Generate action items and Linear issues
 
-```
-Fathom Webhook → Verify Signature → Extract Action Items (AI) → Transform → Slack (Recap + Review) → Linear API
-                          ↓                                              ↓
-                    GitHub Logger                    (Individual Approve/Reject per Issue)
-                          ↓
-                   Domain-based Storage
-```
+## Usage
 
-**Key Improvements:**
-- **Individual Approval**: Each issue can be approved/rejected independently
-- **Slack Recap**: Meeting summaries posted automatically (non-blocking)
-- **State Persistence**: Uses Vercel KV for serverless-friendly state management
-- **Retry Logic**: Automatic retries with exponential backoff for API calls
-- **Better Error Handling**: Detailed logging and graceful error recovery
+### Webhook Setup
 
-See [Architecture Plan](./ARCHITECTURE_PLAN.md) for detailed diagrams and flow.
+1. In Fathom, configure your webhook URL to point to:
+   ```
+   https://your-domain.vercel.app/webhook/fathom
+   ```
+
+2. Set the webhook secret in your environment variables (`FATHOM_WEBHOOK_SECRET`)
+
+3. When a meeting is recorded, Fathom will send a webhook, and the system will:
+   - Extract action items from the transcript
+   - Create a review request
+   - Optionally log the transcript to GitHub
+
+### Review Process
+
+1. **View Reviews**: Navigate to `/reviews` to see all review requests
+2. **Review Details**: Click on a review to see action items and Linear issue previews
+3. **Approve/Reject**: 
+   - Approve all items at once
+   - Approve/reject individual items
+   - Edit items before approval
+4. **Create Linear Issues**: Approved items are automatically created as Linear issues
+
+### Settings Management
+
+Access `/settings` to:
+- Update the Fathom webhook URL
+- Edit AI prompts (with preview functionality)
+- Configure Linear credentials
+- Refresh prompt cache
 
 ## Project Structure
 
 ```
-src/
-├── server.ts              # Main Express server
-├── routes/
-│   ├── webhook.ts         # Fathom webhook endpoint
-│   └── test.ts            # Test endpoints for debugging
-├── services/
-│   ├── fathom/            # Webhook verification
-│   ├── github/            # Transcript logging (domain-based)
-│   ├── ai/
-│   │   ├── action-extractor.ts    # Action item extraction
-│   │   └── recap-generator.ts     # Meeting recap generation
-│   ├── linear/
-│   │   ├── transformer.ts         # Issue transformation
-│   │   └── client.ts              # Issue creation (with retry)
-│   └── slack/
-│       └── reviewer.ts            # Review workflow (individual approval)
-├── types/                 # TypeScript type definitions
-├── config/                # Environment configuration
-└── utils/
-    ├── logger.ts          # Winston-based logging
-    └── retry.ts           # Retry utility with exponential backoff
-api/
-└── index.ts               # Vercel serverless entry point
-scripts/
-├── list-linear-teams.js   # Helper: List Linear teams
-├── test-linear-api.js     # Helper: Test Linear API
-└── send-webhook-to-vercel.js  # Helper: Send test webhooks
+.
+├── app/                      # Next.js app directory
+│   ├── api/                 # API routes
+│   │   ├── auth/           # Authentication routes
+│   │   ├── reviews/        # Review management routes
+│   │   └── settings/       # Settings management routes
+│   ├── components/         # React components
+│   ├── login/              # Login page
+│   ├── reviews/            # Review pages
+│   └── settings/           # Settings page
+├── src/                     # Backend source code
+│   ├── routes/             # Express routes
+│   ├── services/           # Business logic services
+│   │   ├── ai/            # AI services (action extraction, recap)
+│   │   ├── config/        # Settings service
+│   │   ├── github/        # GitHub logging
+│   │   ├── linear/        # Linear integration
+│   │   ├── review/        # Review storage
+│   │   └── slack/         # Slack integration (optional)
+│   ├── config/            # Configuration
+│   ├── types/             # TypeScript types
+│   └── utils/             # Utility functions
+├── middleware.ts           # Next.js middleware for auth
+└── vercel.json            # Vercel configuration
 ```
 
-## Getting Started
+## API Endpoints
 
-1. **Install dependencies**: `npm install`
-2. **Set up environment variables**: See [SETUP.md](./SETUP.md)
-   - Required: `FATHOM_WEBHOOK_SECRET`, `GITHUB_TOKEN`, `OPENAI_API_KEY`, `LINEAR_API_KEY`, `LINEAR_TEAM_ID`
-   - Optional: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `SLACK_CHANNEL_ID` (for review workflow)
-   - For Vercel: `KV_REST_API_URL`, `KV_REST_API_TOKEN` (for state persistence)
-3. **Configure integrations**: Follow the setup guide for each service
-4. **Run locally**: `npm run dev` (see [LOCAL_TESTING.md](./LOCAL_TESTING.md) for ngrok setup)
-5. **Deploy to Vercel**: See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md)
-6. **Test**: Record a meeting in Fathom and check your Slack channel!
+### Webhooks
 
-## How It Works
+- `POST /webhook/fathom` - Receives Fathom webhooks
 
-### Workflow
+### Authentication
 
-1. **Fathom sends webhook** → Your endpoint receives the transcript
-2. **GitHub logging** → Transcript saved to `call_transcript/{domain}/{date}/{recording_id}.json`
-3. **AI extraction** → GPT-5-mini extracts action items from transcript
-4. **Slack recap** → Meeting summary posted to Slack (informational, non-blocking)
-5. **Slack review** → Each action item shown with individual approve/reject buttons
-6. **Individual approval** → Clicking approve creates that specific issue in Linear immediately
-7. **Linear creation** → Issues created with proper formatting, priority, assignee, and state (Triage)
+- `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/check` - Check authentication status
 
-### Key Features
+### Reviews
 
-- **Individual Approval**: Each issue can be approved/rejected independently - no need to approve all at once
-- **Immediate Feedback**: Buttons update instantly when clicked to prevent duplicate submissions
-- **State Persistence**: Uses Vercel KV to store review state (works in serverless environment)
-- **Error Recovery**: Automatic retries with exponential backoff for transient failures
-- **Smart Logging**: GitHub transcripts organized by domain name for easier navigation
+- `GET /api/reviews` - List all reviews (with optional filtering)
+- `GET /api/reviews/[reviewId]` - Get a specific review
+- `POST /api/reviews/create` - Manually create a review from transcript
+- `POST /api/reviews/[reviewId]/approve` - Approve all items in a review
+- `POST /api/reviews/[reviewId]/reject` - Reject a review
+- `POST /api/reviews/[reviewId]/finalize` - Finalize partially approved review
+- `POST /api/reviews/[reviewId]/issues/[issueIndex]/approve` - Approve a single issue
+- `POST /api/reviews/[reviewId]/issues/[issueIndex]/reject` - Reject a single issue
+- `PUT /api/reviews/[reviewId]/action-items/[index]` - Edit an action item
+- `POST /api/reviews/bulk-approve` - Bulk approve reviews
+- `POST /api/reviews/bulk-reject` - Bulk reject reviews
+- `POST /api/reviews/bulk-delete` - Bulk delete reviews
 
-## Documentation
+### Settings
 
-### Setup & Configuration
-- **[SETUP.md](./SETUP.md)** - Complete setup guide with all integrations
-- **[VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md)** - Vercel deployment guide
-- **[VERCEL_KV_SETUP.md](./VERCEL_KV_SETUP.md)** - Setting up Vercel KV for state persistence
-- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - Deployment checklist
+- `GET /api/settings` - Get current settings
+- `PUT /api/settings` - Update settings
+- `POST /api/settings/refresh-cache` - Refresh settings cache
+- `POST /api/settings/preview` - Preview AI prompt output
+- `GET /api/settings/linear-credentials` - Get Linear credentials
 
-### Architecture & Technical
-- **[ARCHITECTURE_PLAN.md](./ARCHITECTURE_PLAN.md)** - System design and architecture
-- **[TECHNICAL_SPEC.md](./TECHNICAL_SPEC.md)** - Technical implementation details
-- **[RETRY_STRATEGY.md](./RETRY_STRATEGY.md)** - Retry logic implementation
+## Development
 
-### Slack Integration
-- **[SLACK_SETUP_VERCEL.md](./SLACK_SETUP_VERCEL.md)** - Slack setup for Vercel deployment
-- **[SLACK_DEBUG_STEPS.md](./SLACK_DEBUG_STEPS.md)** - Debugging Slack integration issues
+### Local Development
 
-### Testing
-- **[TESTING_GUIDE.md](./TESTING_GUIDE.md)** - Guide for testing individual components
-- **[LOCAL_TESTING.md](./LOCAL_TESTING.md)** - Local testing with ngrok
+1. Install dependencies:
+```bash
+npm install
+```
 
+2. Set up environment variables in `.env`
+
+3. Run the development server:
+```bash
+npm run dev
+```
+
+4. Access the application at `http://localhost:3000`
+
+### Building
+
+```bash
+npm run build
+```
+
+### Type Checking
+
+```bash
+npx tsc --noEmit
+```
+
+## Deployment
+
+The application is designed to be deployed on Vercel:
+
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+Or deploy manually:
+```bash
+vercel
+```
+
+## Security
+
+- Password-based authentication for the web interface
+- JWT tokens stored in HTTP-only cookies
+- Environment variables for sensitive configuration
+- Webhook signature verification for Fathom webhooks
+
+## Troubleshooting
+
+### Login Issues
+
+- Ensure `ADMIN_PASSWORD` and `JWT_SECRET` are set in environment variables
+- Check that cookies are enabled in your browser
+- Verify the password doesn't have leading/trailing whitespace
+
+### Webhook Issues
+
+- Verify `FATHOM_WEBHOOK_SECRET` matches your Fathom configuration
+- Check webhook URL is correct in Fathom settings
+- Review Vercel logs for error messages
+
+### Linear Issues Not Created
+
+- Verify Linear API key and team ID are correct
+- Check Linear credentials in settings page
+- Review Vercel logs for API errors
+
+### Prompt Issues
+
+- Use the preview functionality in settings to test prompts
+- Check prompt cache and refresh if needed
+- Verify OpenAI API key is valid
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
