@@ -361,12 +361,12 @@ export default function LandingPage() {
               </div>
 
               <div className="mt-10 pt-8 border-t border-white/20 flex flex-col sm:flex-row gap-4 justify-center">
-                <Link 
+                <a 
                   href="/login"
                   className="bg-white text-indigo-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors inline-block text-center"
                 >
                   Launch Application →
-                </Link>
+                </a>
                 <a 
                   href="https://github.com/KarlRaf/fathom-linear-integration"
                   className="bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-indigo-800 transition-colors inline-block text-center border-2 border-white/20"
