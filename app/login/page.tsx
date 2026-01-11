@@ -34,13 +34,13 @@ function LoginForm() {
               const data = await response.json();
               
               if (data.authenticated) {
-                // Already logged in, redirect to reviews page or redirect URL
+                // Already logged in, redirect to dashboard or redirect URL
                 // Don't redirect to '/' (landing page) for authenticated users
                 const redirect = searchParams.get('redirect');
                 if (redirect && redirect !== '/') {
                   router.push(redirect);
                 } else {
-                  router.push('/reviews'); // Redirect to reviews page instead of landing page
+                  router.push('/dashboard'); // Redirect to dashboard instead of landing page
                 }
               } else {
                 setChecking(false);
@@ -70,13 +70,13 @@ function LoginForm() {
         throw new Error(data.error || 'Login failed');
       }
 
-              // Redirect to reviews page or the redirect URL
+              // Redirect to dashboard or the redirect URL
               // Don't redirect to '/' (landing page) for authenticated users
               const redirect = searchParams.get('redirect');
               if (redirect && redirect !== '/') {
                 router.push(redirect);
               } else {
-                router.push('/reviews'); // Redirect to reviews page instead of landing page
+                router.push('/dashboard'); // Redirect to dashboard instead of landing page
               }
     } catch (err) {
       setMessage({ 
