@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { logger } from '../../utils/logger';
-import { FathomWebhookPayload, CalendarInvitee } from '../../types/fathom';
+import { FathomWebhookPayload } from '../../types/fathom';
+import { extractPrimaryDomain } from '../../utils/domain-extractor';
 
 export class GitHubLogger {
   private octokit: Octokit;
@@ -26,62 +27,13 @@ export class GitHubLogger {
     this.repo = repo;
   }
 
-  /**
-   * Extract the primary domain from calendar_invitees, excluding gmail.com
-   * Returns the most common domain, or null if no valid domains found
-   */
-  private extractPrimaryDomain(calendarInvitees?: Array<CalendarInvitee>): string | null {
-    if (!calendarInvitees || calendarInvitees.length === 0) {
-      return null;
-    }
 
-    // Extract domains, excluding gmail.com
-    const domains = calendarInvitees
-      .map(invitee => {
-        // Prefer email_domain field, fallback to extracting from email
-        let domain = invitee.email_domain;
-        if (!domain && invitee.email) {
-          const emailParts = invitee.email.split('@');
-          if (emailParts.length === 2) {
-            domain = emailParts[1].toLowerCase().trim();
-          }
-        }
-        return domain ? domain.toLowerCase().trim() : null;
-      })
-      .filter((domain): domain is string => {
-        // Filter out null, undefined, empty strings, and gmail.com
-        return !!domain && domain !== 'gmail.com';
-      });
-
-    if (domains.length === 0) {
-      return null;
-    }
-
-    // Count domain occurrences
-    const domainCounts = new Map<string, number>();
-    domains.forEach(domain => {
-      domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
-    });
-
-    // Find the most common domain
-    let maxCount = 0;
-    let primaryDomain: string | null = null;
-    domainCounts.forEach((count, domain) => {
-      if (count > maxCount) {
-        maxCount = count;
-        primaryDomain = domain;
-      }
-    });
-
-    return primaryDomain;
-  }
-
-  async logTranscript(transcript: FathomWebhookPayload): Promise<void> {
+  async logTranscript(transcript: FathomWebhookPayload, explicitDomain?: string): Promise<void> {
     try {
       const date = new Date().toISOString().split('T')[0];
       
-      // Extract primary domain (excluding gmail.com)
-      const domain = this.extractPrimaryDomain(transcript.calendar_invitees);
+      // Use explicit domain if provided, otherwise extract from calendar_invitees
+      const domain = explicitDomain || extractPrimaryDomain(transcript.calendar_invitees);
       
       // Build file path: use domain folder if available, otherwise fallback to current structure
       const filename = domain

@@ -2,41 +2,7 @@ import OpenAI from 'openai';
 import { logger } from '../../utils/logger';
 import { retry } from '../../utils/retry';
 import { ActionItem, ActionItemExtractionResult } from '../../types/action-item';
-
-const EXTRACTION_PROMPT = `You are an assistant that extracts action items from meeting transcripts.
-
-Given the following transcript, extract all action items and format them as JSON.
-
-For each action item, provide:
-- title: A concise, actionable title (max 100 chars)
-- description: Detailed description with context from the transcript
-- assignee: Person responsible (if mentioned, otherwise null)
-- priority: "high", "medium", or "low" based on urgency and importance
-- dueDate: ISO date string (YYYY-MM-DD) if deadline mentioned, otherwise null
-
-Prioritize items as:
-- "high": Urgent items with deadlines or critical blockers
-- "medium": Important items without immediate urgency
-- "low": Nice-to-have items or follow-ups
-
-Return ONLY valid JSON in this format:
-{
-  "actionItems": [
-    {
-      "title": "...",
-      "description": "...",
-      "assignee": "..." or null,
-      "priority": "high" | "medium" | "low",
-      "dueDate": "YYYY-MM-DD" or null
-    }
-  ]
-}
-
-Transcript:
-{{TRANSCRIPT}}
-
-Summary (if available):
-{{SUMMARY}}`;
+import { settingsService } from '../config/settings-service';
 
 export class ActionItemExtractor {
   private client: OpenAI;
@@ -51,7 +17,11 @@ export class ActionItemExtractor {
       return [];
     }
 
-    const prompt = EXTRACTION_PROMPT
+    // Get prompt template from settings service (falls back to default if KV is empty)
+    const settings = await settingsService.getSettings();
+    const promptTemplate = settings.prompts.extraction;
+
+    const prompt = promptTemplate
       .replace('{{TRANSCRIPT}}', transcript)
       .replace('{{SUMMARY}}', summary || 'Not available');
 

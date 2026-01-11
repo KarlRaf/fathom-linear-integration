@@ -6,6 +6,8 @@ import { RecapGenerator } from '../services/ai/recap-generator';
 import { LinearTransformer } from '../services/linear/transformer';
 import { LinearIssueCreator } from '../services/linear/client';
 import { SlackReviewer } from '../services/slack/reviewer';
+import { reviewStorage } from '../services/review/review-storage';
+import { extractPrimaryDomain } from '../utils/domain-extractor';
 import { FathomWebhookPayload } from '../types/fathom';
 import { config } from '../config/env';
 
@@ -366,68 +368,51 @@ export function createTestRouter(services: {
         return res.status(500).json({ error: 'Failed to transform action items' });
       }
 
-      // Step 5: Generate recap (always generate, even if Slack fails)
-      let recapText;
+      // Step 5: Store review in KV for webapp-based approval
       try {
-        recapText = await services.recapGenerator.generateRecap(payload);
-        logger.info('Recap generated successfully');
+        // Generate review ID
+        const reviewId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Extract primary domain from calendar invitees
+        const domain = extractPrimaryDomain(payload.calendar_invitees) || undefined;
+        
+        // Store review in KV
+        await reviewStorage.storeReview({
+          reviewId,
+          actionItems,
+          linearIssues,
+          recordingId: payload.recording.id,
+          meetingTitle: payload.recording.title || 'Meeting',
+          summary: payload.summary,
+          timestamp: Date.now(),
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+          domain,
+          approvedIssueIndices: [],
+          rejectedIssueIndices: [],
+        });
+        
+        logger.info(`Review ${reviewId} stored in KV for webapp approval`);
+        
+        // Determine review URL (use VERCEL_URL if available, otherwise default)
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.VERCEL
+            ? 'https://fathom-linear-integration.vercel.app'
+            : 'http://localhost:3001';
+        
+        return res.json({
+          message: 'Review created - pending approval in webapp',
+          reviewId,
+          reviewUrl: `${baseUrl}/reviews/${reviewId}`,
+          actionItemsCount: actionItems.length,
+          reviewRequired: true,
+          recordingId: payload.recording.id,
+        });
       } catch (error) {
-        logger.error('Failed to generate recap:', error);
-        recapText = 'Failed to generate recap';
+        logger.error('Failed to store review:', error);
+        return res.status(500).json({ error: 'Failed to store review for approval' });
       }
-
-      // Step 6: Post Slack recap and request Linear approval (if Slack is configured)
-      if (services.slackReviewer) {
-        try {
-          // Step 6a: Post recap message (always, no approval needed)
-          try {
-            await services.slackReviewer.postRecapMessage(recapText);
-            logger.info('Recap message posted to Slack');
-          } catch (error) {
-            logger.error('Failed to post recap message to Slack (non-critical):', error);
-            // Continue even if recap posting fails - we'll return the recap text anyway
-          }
-
-          // Step 6b: Request approval for Linear issues
-          const reviewId = await services.slackReviewer.requestReview(
-            actionItems,
-            linearIssues
-          );
-
-          logger.info(`Review ${reviewId} posted to Slack`);
-          
-          return res.json({
-            success: true,
-            message: 'Processing started - recap posted, review pending in Slack',
-            actionItemsCount: actionItems.length,
-            reviewRequired: true,
-            recordingId: payload.recording.id,
-            recap: recapText,
-            recapPosted: true,
-          });
-        } catch (error) {
-          logger.error('Failed to post review to Slack:', error);
-          // Return the recap text even if Slack posting fails
-          return res.json({
-            success: false,
-            message: 'Recap generated but failed to post to Slack',
-            actionItemsCount: actionItems.length,
-            recordingId: payload.recording.id,
-            recap: recapText,
-            recapPosted: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
-      } else {
-        logger.warn('Slack reviewer not configured - skipping Slack review step');
-      }
-
-      res.json({
-        message: 'Mock webhook processed successfully - review pending in Slack',
-        actionItemsCount: actionItems.length,
-        reviewRequired: true,
-        recordingId: payload.recording.id,
-      });
     } catch (error) {
       logger.error('Mock webhook processing error:', error);
       res.status(500).json({

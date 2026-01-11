@@ -1,26 +1,24 @@
 #!/bin/bash
+# Quick script to test webhook and get review URL
 
-# Script to test the webhook with mock data
-# Usage: ./test-webhook.sh
+echo "📤 Sending test webhook..."
+RESPONSE=$(curl -s -X POST http://localhost:3000/test/mock-webhook \
+  -H 'Content-Type: application/json' \
+  -d @mock-webhook-payload.json)
 
-# Check if server is running
-if ! curl -s http://localhost:3000/health > /dev/null 2>&1; then
-    echo "❌ Server is not running on port 3000"
-    echo "Please start the server first: npm run dev"
-    exit 1
+echo ""
+echo "📥 Response:"
+echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+echo ""
+REVIEW_ID=$(echo "$RESPONSE" | grep -o '"reviewId":"[^"]*"' | cut -d'"' -f4)
+if [ -n "$REVIEW_ID" ]; then
+  echo "✅ Review created!"
+  echo "📋 Review ID: $REVIEW_ID"
+  echo "🔗 Review URL: http://localhost:3000/reviews/$REVIEW_ID"
+  echo ""
+  echo "Open in browser:"
+  echo "  open http://localhost:3000/reviews/$REVIEW_ID"
+else
+  echo "⚠️  Could not extract reviewId from response"
 fi
-
-echo "✅ Server is running"
-echo ""
-echo "Sending mock webhook payload..."
-echo ""
-
-# Send the mock payload
-curl -X POST http://localhost:3000/test/mock-webhook \
-  -H "Content-Type: application/json" \
-  -d @mock-webhook-payload.json
-
-echo ""
-echo ""
-echo "Check your terminal logs and Slack channel for results!"
-

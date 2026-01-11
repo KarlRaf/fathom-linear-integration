@@ -6,9 +6,11 @@ import { RecapGenerator } from '../services/ai/recap-generator';
 import { LinearTransformer } from '../services/linear/transformer';
 import { LinearIssueCreator } from '../services/linear/client';
 import { SlackReviewer } from '../services/slack/reviewer';
+import { reviewStorage } from '../services/review/review-storage';
 import { FathomWebhookPayload } from '../types/fathom';
 import { logger } from '../utils/logger';
 import { config } from '../config/env';
+import { extractPrimaryDomain } from '../utils/domain-extractor';
 
 export function createWebhookRouter(services: {
   githubLogger: GitHubLogger;
@@ -116,53 +118,50 @@ export function createWebhookRouter(services: {
         return res.status(500).json({ error: 'Failed to transform action items' });
       }
 
-      // Post Slack recap and request Linear approval (if Slack is configured)
-      if (services.slackReviewer) {
-        try {
-          // Step 1: Post recap message (async, fire and forget - don't wait)
-          // This is non-critical and can happen in the background
-          services.recapGenerator.generateRecap(payload)
-            .then((recapText) => services.slackReviewer!.postRecapMessage(recapText))
-            .then(() => logger.info('Recap message posted to Slack'))
-            .catch((error) => {
-              logger.error('Failed to post recap message (non-critical):', error);
-            });
-
-          // Step 2: Request approval for Linear issues (we need to wait for this)
-          const reviewId = await services.slackReviewer.requestReview(
-            actionItems,
-            linearIssues
-          );
-
-          logger.info(`Review ${reviewId} posted to Slack`);
-          
-          return res.json({
-            message: 'Processing started - recap posting, review pending in Slack',
-            actionItemsCount: actionItems.length,
-            reviewRequired: true,
-            recordingId: payload.recording.id,
-          });
-        } catch (error) {
-          logger.error('Failed to post review to Slack:', error);
-          return res.status(500).json({ error: 'Failed to post review to Slack' });
-        }
-      } else {
-        // Slack not configured - create issues directly
-        try {
-          const issueIds = await services.linearCreator.createIssues(linearIssues);
-          logger.info(`Created ${issueIds.length} issues in Linear:`, issueIds);
-          
-          return res.json({
-            message: 'Processing complete - issues created in Linear',
-            actionItemsCount: actionItems.length,
-            issuesCreated: issueIds.length,
-            reviewRequired: false,
-            recordingId: payload.recording.id,
-          });
-        } catch (error) {
-          logger.error('Failed to create Linear issues:', error);
-          return res.status(500).json({ error: 'Failed to create Linear issues' });
-        }
+      // Store review in KV for webapp-based approval
+      try {
+        // Generate review ID
+        const reviewId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Extract primary domain from calendar invitees
+        const domain = extractPrimaryDomain(payload.calendar_invitees) || undefined;
+        
+        // Store review in KV
+        await reviewStorage.storeReview({
+          reviewId,
+          actionItems,
+          linearIssues,
+          recordingId: payload.recording.id,
+          meetingTitle: payload.recording.title || 'Meeting',
+          summary: payload.summary,
+          timestamp: Date.now(),
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+          domain,
+          approvedIssueIndices: [],
+          rejectedIssueIndices: [],
+        });
+        
+        logger.info(`Review ${reviewId} stored in KV for webapp approval`);
+        
+        // Determine review URL (use VERCEL_URL if available, otherwise default)
+        const baseUrl = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : process.env.VERCEL
+            ? 'https://fathom-linear-integration.vercel.app'
+            : 'http://localhost:3000';
+        
+        return res.json({
+          message: 'Review created - pending approval in webapp',
+          reviewId,
+          reviewUrl: `${baseUrl}/reviews/${reviewId}`,
+          actionItemsCount: actionItems.length,
+          reviewRequired: true,
+          recordingId: payload.recording.id,
+        });
+      } catch (error) {
+        logger.error('Failed to store review:', error);
+        return res.status(500).json({ error: 'Failed to store review for approval' });
       }
     } catch (error) {
       logger.error('Webhook processing error:', error);

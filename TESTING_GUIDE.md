@@ -1,244 +1,226 @@
-# Step-by-Step Testing Guide
+# Testing Guide for Webapp-Based Validation
 
-This guide helps you test each component of the application individually before testing the full flow.
+This guide walks you through testing the new webapp-based validation system.
 
 ## Prerequisites
 
-1. Make sure your `.env` file is configured with all required API keys
-2. Start your development server:
+1. **Environment Variables Set:**
+   - `KV_REST_API_URL` and `KV_REST_API_TOKEN` (for Vercel KV)
+   - `LINEAR_API_KEY` (for creating issues)
+   - `OPENAI_API_KEY` (for AI extraction)
+   - `FATHOM_WEBHOOK_SECRET` (for webhook verification)
+   - Other required env vars (GitHub, etc.)
+
+2. **Build the Project:**
    ```bash
-   npm run dev
+   npm run build
    ```
 
-## Test Endpoints
+## Testing Options
 
-All test endpoints are available at `http://localhost:3000/test/` and only work in development mode.
+### Option 1: Test Locally with Express Server (Recommended for Backend Testing)
 
-### Step 1: Test GitHub Logging
+The Express server handles webhooks. You can test the webhook flow:
 
-**Endpoint:** `POST /test/test-github`
-
-Tests if transcripts are successfully logged to your GitHub repository.
-
-**Test with:**
 ```bash
-curl -X POST http://localhost:3000/test/test-github \
-  -H "Content-Type: application/json" \
-  -d @mock-webhook-payload.json
+# Start the Express server
+npm run dev
+# or
+npm start  # (after building)
 ```
 
-**What to check:**
-- ✅ Response shows success
-- ✅ Go to your GitHub repo: `the-revenue-architects`
-- ✅ Check the `call_transcript/` folder
-- ✅ Verify the transcript file was created
+The server will run on `http://localhost:3000` (or the PORT env var).
 
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Transcript logged to GitHub successfully",
-  "recordingId": "91811043",
-  "filename": "call_transcript/2024-12-31/91811043.json"
-}
-```
-
----
-
-### Step 2: Test Action Items Extraction
-
-**Endpoint:** `POST /test/test-extract`
-
-Tests if action items are correctly extracted from the transcript using OpenAI.
-
-**Test with:**
+**Test Webhook:**
 ```bash
-curl -X POST http://localhost:3000/test/test-extract \
-  -H "Content-Type: application/json" \
-  -d @mock-webhook-payload.json
-```
-
-**What to check:**
-- ✅ Response shows extracted action items
-- ✅ Review the action items for accuracy
-- ✅ Check titles, descriptions, priorities, assignees
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Action items extracted successfully",
-  "actionItemsCount": 4,
-  "actionItems": [
-    {
-      "title": "...",
-      "description": "...",
-      "priority": "high",
-      "assignee": "...",
-      ...
-    }
-  ]
-}
-```
-
----
-
-### Step 3: Test Slack Review
-
-**Endpoint:** `POST /test/test-slack`
-
-Tests if the review message is posted to your Slack channel (without creating Linear issues).
-
-**Test with:**
-```bash
-curl -X POST http://localhost:3000/test/test-slack \
-  -H "Content-Type: application/json" \
-  -d @mock-webhook-payload.json
-```
-
-**What to check:**
-- ✅ Response shows review was posted
-- ✅ Go to your Slack channel
-- ✅ Verify the review message appears with action items
-- ✅ Check that Approve/Reject buttons are present
-- ⚠️ Note: Clicking buttons won't create Linear issues in this test mode
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Review posted to Slack successfully",
-  "reviewId": "review_1234567890_abc123",
-  "actionItemsCount": 4,
-  "linearIssuesPreview": [...]
-}
-```
-
----
-
-### Step 4: Test Linear Issue Creation
-
-**Endpoint:** `POST /test/test-linear`
-
-Tests if issues are created directly in Linear (bypasses Slack review).
-
-**⚠️ Warning:** This will create real issues in Linear!
-
-**Test with:**
-```bash
-curl -X POST http://localhost:3000/test/test-linear \
-  -H "Content-Type: application/json" \
-  -d @mock-webhook-payload.json
-```
-
-**What to check:**
-- ✅ Response shows issues were created
-- ✅ Go to your Linear workspace
-- ✅ Verify the issues appear
-- ✅ Check titles, descriptions, priorities, assignees
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Issues created in Linear successfully",
-  "issuesCount": 4,
-  "issueIds": ["abc-123", "def-456", ...],
-  "issuesPreview": [...]
-}
-```
-
----
-
-### Full Flow Test
-
-**Endpoint:** `POST /test/mock-webhook`
-
-Tests the complete flow: GitHub → Extract → Slack → Linear (after approval).
-
-**Test with:**
-```bash
+# Send a test webhook (you'll need to create a test script or use the existing test route)
 curl -X POST http://localhost:3000/test/mock-webhook \
   -H "Content-Type: application/json" \
   -d @mock-webhook-payload.json
 ```
 
-Or use the script:
-```bash
-./test-webhook.sh
-```
+**Check Reviews:**
+- Reviews should be stored in KV
+- Check logs to see reviewId
+- Review URL will be in the response: `/reviews/{reviewId}`
 
----
+### Option 2: Test with Next.js (Recommended for UI Testing)
 
-## Quick Test Script
-
-Use the provided script to test steps individually or all at once:
+Since we have Next.js for the UI, you can test the full stack:
 
 ```bash
-# Test a specific step
-./test-steps.sh github    # Test GitHub logging
-./test-steps.sh extract   # Test action items extraction
-./test-steps.sh slack     # Test Slack review
-./test-steps.sh linear    # Test Linear creation
+# In one terminal - start Next.js dev server
+npx next dev
 
-# Test all steps in sequence (with pauses)
-./test-steps.sh all
+# In another terminal - start Express server (if needed for webhooks)
+npm run dev
 ```
 
----
+**Note:** Next.js and Express might conflict on the same port. You may need to:
+- Run Express on port 3000
+- Run Next.js on port 3001
+- Or use Vercel's dev server which handles both
 
-## Testing Checklist
+### Option 3: Test on Vercel (Recommended for Full Integration)
 
-Use this checklist to verify each component:
+Deploy to Vercel and test the full integration:
 
-- [ ] **GitHub Logging**
-  - [ ] Transcript file created in repository
-  - [ ] File is in correct folder structure (`call_transcript/YYYY-MM-DD/`)
-  - [ ] File contains complete transcript data
+```bash
+# Deploy to Vercel
+vercel --prod
 
-- [ ] **Action Items Extraction**
-  - [ ] Action items are extracted from transcript
-  - [ ] Titles are clear and actionable
-  - [ ] Descriptions include context
-  - [ ] Priorities are set correctly
-  - [ ] Assignees are identified (if mentioned)
+# Or use Vercel dev for local testing with Vercel's infrastructure
+vercel dev
+```
 
-- [ ] **Slack Review**
-  - [ ] Message appears in Slack channel
-  - [ ] All action items are displayed
-  - [ ] Approve/Reject buttons work
-  - [ ] Message formatting looks good
+## Testing Steps
 
-- [ ] **Linear Issue Creation**
-  - [ ] Issues are created in Linear
-  - [ ] Titles and descriptions are correct
-  - [ ] Priorities are mapped correctly
-  - [ ] Assignees are set (if found)
-  - [ ] Issues are in correct team/project
+### 1. Test Webhook Reception
 
----
+Send a Fathom webhook (or use the test route):
+
+```bash
+# Using the test route (if in development mode)
+curl -X POST http://localhost:3000/test/mock-webhook \
+  -H "Content-Type: application/json" \
+  -d @mock-webhook-payload.json
+```
+
+**Expected Result:**
+- Response should include `reviewId` and `reviewUrl`
+- Review should be stored in KV with status 'pending'
+- Check server logs for confirmation
+
+### 2. Test Reviews List Page
+
+Navigate to: `http://localhost:3000/reviews` (or your deployment URL)
+
+**Expected:**
+- List of pending reviews
+- Each review shows: title, timestamp, action items count, status
+- Can filter by status
+- Click on a review to see details
+
+### 3. Test Review Detail Page
+
+Navigate to: `http://localhost:3000/reviews/{reviewId}`
+
+**Expected:**
+- Full review details
+- All action items displayed
+- Linear issue previews
+- Approve/Reject buttons
+- Individual approve/reject buttons per issue
+- Edit buttons for action items
+
+### 4. Test Individual Issue Approval
+
+1. Open a review detail page
+2. Click "✅ Approve" on an individual issue
+3. Check that the issue shows "✅ Approved" status
+4. Review status should change to "partially-approved" if not all are approved
+
+### 5. Test Action Item Editing
+
+1. Open a review detail page
+2. Click "✏️ Edit" on an action item
+3. Modify the title, description, assignee, priority, or due date
+4. Click "Save"
+5. Check that changes are saved and "Has edits" indicator appears
+
+### 6. Test Finalize Review
+
+1. Approve some (but not all) issues individually
+2. Click "Finalize & Create X Issue(s)" button
+3. Check that Linear issues are created for approved items only
+4. Review status should change to "approved"
+5. Check Linear workspace to verify issues were created
+
+### 7. Test Approve All
+
+1. Open a review detail page
+2. Click "Approve All & Create Issues"
+3. Check that all Linear issues are created
+4. Review status should change to "approved"
+5. Check Linear workspace to verify all issues were created
+
+### 8. Test Reject
+
+1. Open a review detail page
+2. Click "Reject" (individual or all)
+3. Review status should change to "rejected"
+4. No Linear issues should be created
+
+## API Testing (Manual)
+
+You can also test the API routes directly:
+
+### List Reviews
+```bash
+curl http://localhost:3000/api/reviews
+```
+
+### Get Review Details
+```bash
+curl http://localhost:3000/api/reviews/{reviewId}
+```
+
+### Approve Individual Issue
+```bash
+curl -X POST http://localhost:3000/api/reviews/{reviewId}/issues/0/approve
+```
+
+### Reject Individual Issue
+```bash
+curl -X POST http://localhost:3000/api/reviews/{reviewId}/issues/0/reject
+```
+
+### Update Action Item
+```bash
+curl -X PUT http://localhost:3000/api/reviews/{reviewId}/action-items/0 \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Updated Title", "priority": "high"}'
+```
+
+### Finalize Review
+```bash
+curl -X POST http://localhost:3000/api/reviews/{reviewId}/finalize
+```
+
+### Approve All
+```bash
+curl -X POST http://localhost:3000/api/reviews/{reviewId}/approve
+```
 
 ## Troubleshooting
 
-### GitHub Logging Fails
-- Check `GITHUB_TOKEN` is valid
-- Verify `GITHUB_REPO_OWNER` and `GITHUB_REPO_NAME` are correct
-- Ensure the repository exists and token has write access
+### Issue: Reviews not appearing
+- Check KV connection (verify env vars)
+- Check server logs for errors
+- Verify webhook was received successfully
+- Check KV storage directly (if you have access)
 
-### Action Items Extraction Fails
-- Check `OPENAI_API_KEY` is valid
-- Verify you have API credits
-- Check transcript is not empty
+### Issue: Linear issues not created
+- Verify LINEAR_API_KEY is set
+- Check API route logs for errors
+- Verify Linear API key has proper permissions
+- Check that issues are actually approved before finalizing
 
-### Slack Review Fails
-- Check `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` are correct
-- Verify `SLACK_CHANNEL_ID` is correct
-- Ensure bot is invited to the channel
-- Check Slack app has required permissions
+### Issue: Next.js and Express conflict
+- Use `vercel dev` which handles both
+- Or run Express on one port and Next.js on another
+- Or deploy to Vercel and test there
 
-### Linear Creation Fails
-- Check `LINEAR_API_KEY` is valid
-- Verify `LINEAR_TEAM_ID` is correct
-- Ensure API key has permissions to create issues
-- Check team ID exists in your workspace
+### Issue: TypeScript errors
+- Run `npm run build` to check for compilation errors
+- Check that all dependencies are installed
+- Verify tsconfig files are correct
 
+## Next Steps After Testing
+
+1. Verify all features work as expected
+2. Test error handling (invalid reviewId, network errors, etc.)
+3. Test with real Fathom webhooks
+4. Verify Linear issue creation works correctly
+5. Check that edited action items are properly handled
+6. Test partial approvals and finalization
