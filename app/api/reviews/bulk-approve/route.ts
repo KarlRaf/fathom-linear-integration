@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { reviewStorage } from '../../../../src/services/review/review-storage';
-import { LinearIssueCreator } from '../../../../src/services/linear/client';
-import { config } from '../../../../src/config/env';
-
-const linearClient = new LinearIssueCreator(config.linear.apiKey);
+import { LinearClient } from '@linear/sdk';
+import { getLinearConfig } from '../../../../src/utils/linear-config';
 
 export async function POST(request: NextRequest) {
   try {
