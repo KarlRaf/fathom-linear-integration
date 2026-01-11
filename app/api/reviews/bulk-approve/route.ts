@@ -6,7 +6,6 @@ import { config } from '../../../../src/config/env';
 const linearClient = new LinearIssueCreator(config.linear.apiKey);
 
 export async function POST(request: NextRequest) {
-  await initServices();
   try {
     const { reviewIds } = await request.json();
     
