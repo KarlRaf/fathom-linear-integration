@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         
         for (const issueInput of issuesToCreate) {
           try {
-            const issuePayload = await linearClient.createIssue({
+            const issuePayload = await linearClient.issueCreate({
               teamId: issueInput.teamId,
               title: issueInput.title,
               description: issueInput.description,
