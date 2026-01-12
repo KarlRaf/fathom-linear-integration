@@ -74,16 +74,21 @@ export class ReviewStorage {
   async getReview(reviewId: string): Promise<ReviewRequest | null> {
     try {
       const key = this.getReviewKey(reviewId);
+      logger.info(`Fetching review from KV with key: ${key}`);
       const data = await kv.get<string | ReviewRequest>(key);
       
-      if (!data) return null;
+      if (!data) {
+        logger.warn(`Review not found in KV for key: ${key}`);
+        return null;
+      }
       
+      logger.info(`Review found in KV for key: ${key}`);
       if (typeof data === 'string') {
         return JSON.parse(data) as ReviewRequest;
       }
       return data as ReviewRequest;
     } catch (error) {
-      logger.error(`Failed to get review ${reviewId}:`, error);
+      logger.error(`Failed to get review ${reviewId} from KV:`, error);
       return null;
     }
   }
