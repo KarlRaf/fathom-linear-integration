@@ -84,7 +84,7 @@ export default function ReviewDetailPage() {
     try {
       setProcessing(true);
       setMessage(null);
-      const response = await fetch(`/api/reviews/${reviewId}/approve`, {
+      const response = await fetch(`/api/reviews/approve?reviewId=${reviewId}`, {
         method: 'POST',
       });
 
@@ -136,7 +136,7 @@ export default function ReviewDetailPage() {
     try {
       setProcessing(true);
       setMessage(null);
-      const response = await fetch(`/api/reviews/${reviewId}/reject`, {
+      const response = await fetch(`/api/reviews/reject?reviewId=${reviewId}`, {
         method: 'POST',
       });
 
@@ -158,7 +158,7 @@ export default function ReviewDetailPage() {
 
   const handleIssueApprove = async (index: number) => {
     try {
-      const response = await fetch(`/api/reviews/${reviewId}/issues/${index}/approve`, {
+      const response = await fetch(`/api/reviews/issues/approve?reviewId=${reviewId}&issueIndex=${index}`, {
         method: 'POST',
       });
 
@@ -175,7 +175,7 @@ export default function ReviewDetailPage() {
 
   const handleIssueReject = async (index: number) => {
     try {
-      const response = await fetch(`/api/reviews/${reviewId}/issues/${index}/reject`, {
+      const response = await fetch(`/api/reviews/issues/reject?reviewId=${reviewId}&issueIndex=${index}`, {
         method: 'POST',
       });
 
@@ -198,7 +198,7 @@ export default function ReviewDetailPage() {
     try {
       setProcessing(true);
       setMessage(null);
-      const response = await fetch(`/api/reviews/${reviewId}/finalize`, {
+      const response = await fetch(`/api/reviews/finalize?reviewId=${reviewId}`, {
         method: 'POST',
       });
 
@@ -243,7 +243,7 @@ export default function ReviewDetailPage() {
 
   const handleEditSave = async (index: number) => {
     try {
-      const response = await fetch(`/api/reviews/${reviewId}/action-items/${index}`, {
+      const response = await fetch(`/api/reviews/action-items?reviewId=${reviewId}&index=${index}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editForm),
