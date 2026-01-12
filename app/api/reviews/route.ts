@@ -10,6 +10,26 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
+    
+    // If reviewId is provided, return a single review (workaround for dynamic routes)
+    const reviewId = searchParams.get('reviewId');
+    if (reviewId) {
+      const { reviewStorage } = await import('../../../../src/services/review/review-storage');
+      console.log(`Fetching review: ${reviewId}`);
+      const review = await reviewStorage.getReview(reviewId);
+      
+      if (!review) {
+        console.log(`Review not found: ${reviewId}`);
+        return NextResponse.json(
+          { error: 'Review not found' },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json(review);
+    }
+    
+    // Otherwise, return list of reviews (existing behavior)
     const status = searchParams.get('status') || 'pending';
     const search = searchParams.get('search') || '';
     const from = searchParams.get('from');
@@ -79,9 +99,9 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(reviews);
   } catch (error) {
-    console.error('Failed to list reviews:', error);
+    console.error('Failed to get reviews:', error);
     return NextResponse.json(
-      { error: 'Failed to list reviews' },
+      { error: 'Failed to get reviews' },
       { status: 500 }
     );
   }

@@ -62,7 +62,7 @@ export default function ReviewDetailPage() {
   const fetchReview = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/reviews/${reviewId}`);
+      const response = await fetch(`/api/reviews?reviewId=${reviewId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch review');
       }
