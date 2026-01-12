@@ -58,15 +58,16 @@ export class ReviewStorage {
   async storeReview(review: ReviewRequest): Promise<void> {
     try {
       const key = this.getReviewKey(review.reviewId);
+      logger.info(`Storing review in KV with key: ${key}, reviewId: ${review.reviewId}`);
       await kv.set(key, JSON.stringify(review), { ex: REVIEW_TTL });
       
       // Add to list (using a set to avoid duplicates)
       await kv.sadd(REVIEW_LIST_KEY, review.reviewId);
       await kv.expire(REVIEW_LIST_KEY, REVIEW_TTL);
       
-      logger.info(`Stored review ${review.reviewId} in KV`);
+      logger.info(`Successfully stored review ${review.reviewId} in KV with key: ${key}`);
     } catch (error) {
-      logger.error(`Failed to store review ${review.reviewId}:`, error);
+      logger.error(`Failed to store review ${review.reviewId} in KV:`, error);
       throw error;
     }
   }
