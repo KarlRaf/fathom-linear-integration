@@ -78,22 +78,25 @@ export async function POST(request: NextRequest) {
     // Generate meeting title if not provided
     const finalMeetingTitle = meetingTitle?.trim() || `Manual Review - ${new Date().toLocaleString()}`;
     
+    // Create review object
+    const reviewData = {
+      reviewId,
+      actionItems,
+      linearIssues,
+      recordingId: `manual_${Date.now()}`,
+      meetingTitle: finalMeetingTitle,
+      summary: summary || '',
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+      status: 'pending' as const,
+      domain: domain?.trim() || undefined,
+      approvedIssueIndices: [] as number[],
+      rejectedIssueIndices: [] as number[],
+    };
+    
     // Store review
     try {
-      await reviewStorage.storeReview({
-        reviewId,
-        actionItems,
-        linearIssues,
-        recordingId: `manual_${Date.now()}`,
-        meetingTitle: finalMeetingTitle,
-        summary: summary || '',
-        timestamp: Date.now(),
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-        domain: domain?.trim() || undefined,
-        approvedIssueIndices: [],
-        rejectedIssueIndices: [],
-      });
+      await reviewStorage.storeReview(reviewData);
       logger.info(`Stored manual review ${reviewId} with ${actionItems.length} action items`);
     } catch (error) {
       logger.error('Failed to store manual review:', error);
@@ -140,13 +143,12 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Get the stored review to return
-    const review = await reviewStorage.getReview(reviewId);
-    
+    // Return the review data directly instead of fetching it back
+    // This avoids potential KV read-after-write consistency issues
     return NextResponse.json({
       success: true,
       reviewId,
-      review: review || null,
+      review: reviewData,
     });
   } catch (error) {
     logger.error('Failed to create manual review:', error);
