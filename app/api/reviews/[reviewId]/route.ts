@@ -7,9 +7,19 @@ export async function GET(
 ) {
   try {
     const reviewId = params.reviewId;
+    
+    if (!reviewId) {
+      return NextResponse.json(
+        { error: 'Review ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    console.log(`Fetching review: ${reviewId}`);
     const review = await reviewStorage.getReview(reviewId);
     
     if (!review) {
+      console.log(`Review not found: ${reviewId}`);
       return NextResponse.json(
         { error: 'Review not found' },
         { status: 404 }
@@ -18,9 +28,9 @@ export async function GET(
     
     return NextResponse.json(review);
   } catch (error) {
-    console.error(`Failed to get review ${params.reviewId}:`, error);
+    console.error(`Failed to get review ${params?.reviewId || 'unknown'}:`, error);
     return NextResponse.json(
-      { error: 'Failed to get review' },
+      { error: 'Failed to get review', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
