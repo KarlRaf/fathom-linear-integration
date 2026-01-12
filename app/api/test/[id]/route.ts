@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Explicitly set runtime for Vercel compatibility
 
 export async function GET(
   request: NextRequest,

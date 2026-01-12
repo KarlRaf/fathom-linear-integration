@@ -3,6 +3,7 @@ import { reviewStorage } from '../../../../src/services/review/review-storage';
 
 // Mark route as dynamic
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Explicitly set runtime for Vercel compatibility
 
 export async function GET(
   request: NextRequest,
