@@ -4,6 +4,9 @@ import { kv } from '@vercel/kv';
 const REVIEW_PREFIX = 'pending_review:';
 const REVIEW_LIST_KEY = 'pending_reviews:list';
 
+// Mark route as dynamic since it uses searchParams
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
