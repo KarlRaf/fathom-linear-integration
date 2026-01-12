@@ -6,7 +6,7 @@ const REVIEW_LIST_KEY = 'pending_reviews:list';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const status = searchParams.get('status') || 'pending';
     const search = searchParams.get('search') || '';
     const from = searchParams.get('from');
