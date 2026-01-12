@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
+import { reviewStorage } from '../../../src/services/review/review-storage';
 
 const REVIEW_PREFIX = 'pending_review:';
 const REVIEW_LIST_KEY = 'pending_reviews:list';
@@ -14,7 +15,6 @@ export async function GET(request: NextRequest) {
     // If reviewId is provided, return a single review (workaround for dynamic routes)
     const reviewId = searchParams.get('reviewId');
     if (reviewId) {
-      const { reviewStorage } = await import('../../../../src/services/review/review-storage');
       console.log(`Fetching review: ${reviewId}`);
       const review = await reviewStorage.getReview(reviewId);
       
